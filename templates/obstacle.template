@@ -1,0 +1,14 @@
+
+position
+(
+  name   "<name>"
+  size   [ <size_x> <size_y> 0.5 ]
+  origin [ <orig_x> <orig_y> 0 0 ]
+  pose   [ <pose_x> <pose_y> 0 <pose_t> ]
+  drive  "<drive>"
+  velocity_bounds [ -<sp_lin> <sp_lin> -<sp_lin> <sp_lin> 0 0 -<sp_ang> <sp_ang> ]
+  localization    "gps"
+  ranger_return   1
+
+  <bitmap>
+)

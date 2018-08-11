@@ -1,0 +1,442 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ObjectConfig</class>
+ <widget class="QWidget" name="ObjectConfig">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>180</width>
+    <height>460</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Config</string>
+  </property>
+  <layout class="QGridLayout" name="gridLayout_3" columnstretch="0,0">
+   <property name="sizeConstraint">
+    <enum>QLayout::SetFixedSize</enum>
+   </property>
+   <property name="leftMargin">
+    <number>5</number>
+   </property>
+   <property name="topMargin">
+    <number>5</number>
+   </property>
+   <property name="rightMargin">
+    <number>5</number>
+   </property>
+   <property name="bottomMargin">
+    <number>5</number>
+   </property>
+   <property name="spacing">
+    <number>5</number>
+   </property>
+   <item row="8" column="0" colspan="2">
+    <widget class="QPushButton" name="_pbRemove">
+     <property name="text">
+      <string>Remove</string>
+     </property>
+     <property name="icon">
+      <iconset resource="../resources.qrc">
+       <normaloff>:/icons/remove.png</normaloff>:/icons/remove.png</iconset>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="0">
+    <widget class="QLabel" name="label_18">
+     <property name="text">
+      <string>Type:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="1">
+    <widget class="QDoubleSpinBox" name="_sizeX">
+     <property name="suffix">
+      <string> m</string>
+     </property>
+     <property name="minimum">
+      <double>0.010000000000000</double>
+     </property>
+     <property name="singleStep">
+      <double>0.050000000000000</double>
+     </property>
+     <property name="value">
+      <double>0.350000000000000</double>
+     </property>
+    </widget>
+   </item>
+   <item row="6" column="0" colspan="2">
+    <widget class="QGroupBox" name="_gbSpeed">
+     <property name="title">
+      <string>Speed</string>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_2" columnstretch="0,1">
+      <property name="leftMargin">
+       <number>3</number>
+      </property>
+      <property name="topMargin">
+       <number>2</number>
+      </property>
+      <property name="rightMargin">
+       <number>2</number>
+      </property>
+      <property name="bottomMargin">
+       <number>1</number>
+      </property>
+      <property name="spacing">
+       <number>5</number>
+      </property>
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_10">
+        <property name="text">
+         <string>lin:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QDoubleSpinBox" name="_speedLinear">
+        <property name="suffix">
+         <string> m/s</string>
+        </property>
+        <property name="minimum">
+         <double>0.000000000000000</double>
+        </property>
+        <property name="maximum">
+         <double>100.000000000000000</double>
+        </property>
+        <property name="value">
+         <double>1.000000000000000</double>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_6">
+        <property name="text">
+         <string>ang:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QDoubleSpinBox" name="_speedAngular">
+        <property name="suffix">
+         <string> º/s</string>
+        </property>
+        <property name="minimum">
+         <double>0.000000000000000</double>
+        </property>
+        <property name="maximum">
+         <double>1080.000000000000000</double>
+        </property>
+        <property name="value">
+         <double>90.000000000000000</double>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item row="0" column="1">
+    <widget class="QComboBox" name="_objectType">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
+     <item>
+      <property name="text">
+       <string>obstacle</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>robot</string>
+      </property>
+     </item>
+    </widget>
+   </item>
+   <item row="1" column="0">
+    <widget class="QLabel" name="label_20">
+     <property name="text">
+      <string>Shape:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="4" column="1">
+    <widget class="QDoubleSpinBox" name="_sizeY">
+     <property name="suffix">
+      <string> m</string>
+     </property>
+     <property name="minimum">
+      <double>0.010000000000000</double>
+     </property>
+     <property name="singleStep">
+      <double>0.050000000000000</double>
+     </property>
+     <property name="value">
+      <double>0.350000000000000</double>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="0">
+    <widget class="QLabel" name="label_7">
+     <property name="text">
+      <string>Size X:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="1">
+    <layout class="QHBoxLayout" name="horizontalLayout" stretch="1,0">
+     <property name="spacing">
+      <number>5</number>
+     </property>
+     <item>
+      <widget class="QComboBox" name="_shapeType">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <item>
+        <property name="text">
+         <string>box</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>ellipse</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>custom</string>
+        </property>
+       </item>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="_pbSelectShape">
+       <property name="enabled">
+        <bool>true</bool>
+       </property>
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>32</width>
+         <height>16777215</height>
+        </size>
+       </property>
+       <property name="text">
+        <string>...</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item row="4" column="0">
+    <widget class="QLabel" name="label_8">
+     <property name="text">
+      <string>Size Y:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="0">
+    <widget class="QLabel" name="label_2">
+     <property name="text">
+      <string>Color:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="1">
+    <widget class="ColorPicker" name="_color">
+     <property name="text">
+      <string/>
+     </property>
+    </widget>
+   </item>
+   <item row="5" column="0" colspan="2">
+    <widget class="QGroupBox" name="groupBox">
+     <property name="title">
+      <string>Motion</string>
+     </property>
+     <layout class="QGridLayout" name="gridLayout" columnstretch="0,1">
+      <property name="leftMargin">
+       <number>3</number>
+      </property>
+      <property name="topMargin">
+       <number>2</number>
+      </property>
+      <property name="rightMargin">
+       <number>2</number>
+      </property>
+      <property name="bottomMargin">
+       <number>1</number>
+      </property>
+      <property name="spacing">
+       <number>5</number>
+      </property>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_3">
+        <property name="text">
+         <string>Drive:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QComboBox" name="_driveType">
+        <item>
+         <property name="text">
+          <string>differential</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>omni</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+      <item row="0" column="0">
+       <widget class="QLabel" name="label">
+        <property name="text">
+         <string>Type:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QComboBox" name="_motionType">
+        <item>
+         <property name="text">
+          <string>static</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>rand. speed</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>rand. pose</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>trajectory</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item row="7" column="0" colspan="2">
+    <widget class="QGroupBox" name="_gbOdomNoise">
+     <property name="title">
+      <string>Odometry noise</string>
+     </property>
+     <property name="checkable">
+      <bool>true</bool>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_4" columnstretch="0,1">
+      <property name="leftMargin">
+       <number>3</number>
+      </property>
+      <property name="topMargin">
+       <number>2</number>
+      </property>
+      <property name="rightMargin">
+       <number>2</number>
+      </property>
+      <property name="bottomMargin">
+       <number>1</number>
+      </property>
+      <property name="spacing">
+       <number>5</number>
+      </property>
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_11">
+        <property name="text">
+         <string>lin:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QDoubleSpinBox" name="_odomNoiseLin">
+        <property name="suffix">
+         <string/>
+        </property>
+        <property name="minimum">
+         <double>0.000000000000000</double>
+        </property>
+        <property name="maximum">
+         <double>1.000000000000000</double>
+        </property>
+        <property name="singleStep">
+         <double>0.050000000000000</double>
+        </property>
+        <property name="value">
+         <double>0.030000000000000</double>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_9">
+        <property name="text">
+         <string>ang:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QDoubleSpinBox" name="_odomNoiseAng">
+        <property name="suffix">
+         <string/>
+        </property>
+        <property name="minimum">
+         <double>0.000000000000000</double>
+        </property>
+        <property name="maximum">
+         <double>30.000000000000000</double>
+        </property>
+        <property name="singleStep">
+         <double>0.050000000000000</double>
+        </property>
+        <property name="value">
+         <double>0.050000000000000</double>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
+  <zorder>label_18</zorder>
+  <zorder>_objectType</zorder>
+  <zorder>label_7</zorder>
+  <zorder>_gbSpeed</zorder>
+  <zorder>label_20</zorder>
+  <zorder>_sizeY</zorder>
+  <zorder>_sizeX</zorder>
+  <zorder>label_8</zorder>
+  <zorder>_pbRemove</zorder>
+  <zorder>label_2</zorder>
+  <zorder>_color</zorder>
+  <zorder>groupBox</zorder>
+  <zorder>_gbOdomNoise</zorder>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>ColorPicker</class>
+   <extends>QPushButton</extends>
+   <header>widgets.h</header>
+  </customwidget>
+ </customwidgets>
+ <resources>
+  <include location="../resources.qrc"/>
+ </resources>
+ <connections/>
+</ui>

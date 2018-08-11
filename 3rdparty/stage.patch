@@ -1,0 +1,125 @@
+diff --git a/libstage/ancestor.cc b/libstage/ancestor.cc
+index aee2cbf..d9e6b01 100644
+--- a/libstage/ancestor.cc
++++ b/libstage/ancestor.cc
+@@ -8,8 +8,8 @@ Ancestor::Ancestor() : child_type_counts(), children(), debug(false), props(), t
+ 
+ Ancestor::~Ancestor()
+ {
+-  FOR_EACH (it, children)
+-    delete (*it);
++    while(!children.empty())
++        delete children.front();
+ }
+ 
+ void Ancestor::AddChild(Model *mod)
+diff --git a/libstage/stage.hh b/libstage/stage.hh
+index 92a1d5f..eb6a242 100644
+--- a/libstage/stage.hh
++++ b/libstage/stage.hh
+@@ -838,6 +838,12 @@ quickly finding nearby fidcucials */
+   int total_subs; ///< the total number of subscriptions to all models
+   unsigned int worker_threads; ///< the number of worker threads to use
+ 
++  //--- safe worker threads handling ----
++  void StopWorkerThreads();
++
++  volatile bool workers_exit;
++  std::vector<pthread_t> workers_list;
++
+ protected:
+   std::list<std::pair<world_callback_t, void *> >
+       cb_list; ///< List of callback functions and arguments
+diff --git a/libstage/world.cc b/libstage/world.cc
+index cc44ad5..3c9aef6 100644
+--- a/libstage/world.cc
++++ b/libstage/world.cc
+@@ -134,7 +134,7 @@ World::World(const std::string &,
+       quit(false), show_clock(false),
+       show_clock_interval(100), // 10 simulated seconds using defaults
+       sync_mutex(), threads_working(0), threads_start_cond(), threads_done_cond(), total_subs(0),
+-      worker_threads(1),
++      worker_threads(1), workers_exit(false),
+ 
+       // protected
+       cb_list(), extent(), graphics(false), option_table(), powerpack_list(), quit_time(0),
+@@ -166,10 +166,7 @@ World::World(const std::string &,
+ World::~World(void)
+ {
+   PRINT_DEBUG1("destroying world %s", Token());
+-  if (ground)
+-    delete ground;
+-  if (wf)
+-    delete wf;
++  if(token != "[unloaded]") UnLoad();
+   World::world_set.erase(this);
+ }
+ 
+@@ -234,12 +231,14 @@ void *World::update_thread_entry(std::pair<World *, int> *thread_info)
+ 
+   pthread_mutex_lock(&world->sync_mutex);
+ 
+-  while (1) {
++  while (!world->workers_exit) {
+     // printf( "thread ID %d waiting for start\n", thread_instance );
+     // wait until the main thread signals us
+     // puts( "worker waiting for start signal" );
+ 
+-    pthread_cond_wait(&world->threads_start_cond, &world->sync_mutex);
++    if(world->threads_working <= 0) {
++      pthread_cond_wait(&world->threads_start_cond, &world->sync_mutex);
++    }
+     pthread_mutex_unlock(&world->sync_mutex);
+ 
+     // printf( "worker %u thread awakes for task %u\n", thread_instance, task );
+@@ -435,6 +434,7 @@ void World::LoadWorldPostHook()
+     pthread_t pt;
+     pthread_create(&pt, NULL, (func_ptr)World::update_thread_entry,
+                    new std::pair<World *, int>(this, t + 1));
++    workers_list.push_back(pt);
+   }
+ 
+   if (worker_threads > 1)
+@@ -471,14 +471,29 @@ void World::LoadWorldPostHook()
+   putchar('\n');
+ }
+ 
++void World::StopWorkerThreads() {
++  if(workers_list.empty()) return;
++
++  workers_exit = true;
++  pthread_cond_broadcast(&threads_start_cond);
++  FOR_EACH (it, workers_list) {
++    pthread_join(*it, NULL);
++  }
++  workers_list.clear();
++  workers_exit = false;
++}
++
+ void World::UnLoad()
+ {
+   if (wf)
+     delete wf;
+ 
+-  FOR_EACH (it, children)
+-    delete (*it);
+-  children.clear();
++  while(!children.empty()) {
++      delete children.front();
++  }
++
++  wf = 0;
++  ground = 0;
+ 
+   models_by_name.clear();
+   models_by_wfentity.clear();
+@@ -488,6 +503,9 @@ void World::UnLoad()
+   // todo - clean up regions & superregions?
+ 
+   token = "[unloaded]";
++
++  // also stop worker threads
++  StopWorkerThreads();
+ }
+ 
+ bool World::PastQuitTime()

@@ -1,0 +1,13 @@
+<RCC>
+    <qresource prefix="/">
+        <file>icons/info.png</file>
+        <file>icons/remove.png</file>
+        <file>icons/update.png</file>
+        <file>icons/warning.png</file>
+        <file>templates/world.template</file>
+        <file>templates/obstacle.template</file>
+        <file>templates/robot.template</file>
+        <file>icons/cube.png</file>
+        <file>icons/route.png</file>
+    </qresource>
+</RCC>

@@ -1,0 +1,28 @@
+
+position
+(
+  name   "<robot_name>"
+  color  "blue"
+  size   [ <robot_size_x> <robot_size_y> 0.25 ]
+  origin [ 0 0 0 0 ]
+  pose   [ <robot_x> <robot_y> 0 <robot_th> ]
+  drive  "<robot_drive>"
+  velocity_bounds [ -<robot_slx> <robot_slx> -<robot_sly> <robot_sly> 0 0 -<robot_sa> <robot_sa> ]
+  localization    "<robot_loc>"
+  odom_error      [ <robot_nlx> <robot_nly> 0 <robot_na> ]
+  gui_nose 1
+
+  ranger
+  (
+    sensor(
+      range   [ <laser_rmin> <laser_rmax> ]
+      fov     <laser_fov>
+      samples <laser_samples>
+      noise   [ <laser_nc> <laser_np> <laser_na> ]
+    )
+    name  "<robot_name>.laser"
+    color "black"
+    size  [ 0.05 0.05 0.1 ]
+    pose  [ 0 0 0 0 ]
+  )
+)
