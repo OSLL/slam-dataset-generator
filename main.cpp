@@ -4,6 +4,8 @@
 #include "mainwindow.h"
 
 int main(int argc, char *argv[]) {
+    qRegisterMetaTypeStreamOperators<Pose>("Pose");
+
     QApplication a(argc, argv);
 
     qsrand(QDateTime::currentMSecsSinceEpoch());

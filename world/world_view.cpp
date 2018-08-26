@@ -36,6 +36,7 @@ WorldView::WorldView(WorldModel *model, QWidget *parent)
     _itemControls = new ControlStack(this);
     _trajUpdateTimer = new DelayTimer(500, this);
 
+    connect(_model, SIGNAL(cleared()), this, SLOT(clear()));
     connect(_model, SIGNAL(mapChanged(QPixmap)), this, SLOT(setMap(QPixmap)));
     connect(_model, SIGNAL(objectCreated(WorldObject*)), this, SLOT(createObject(WorldObject*)));
     connect(_model, SIGNAL(objectRemoved(WorldObject*)), this, SLOT(removeObject(WorldObject*)));
@@ -46,13 +47,6 @@ WorldView::WorldView(WorldModel *model, QWidget *parent)
 
     connect(_trajUpdateTimer, SIGNAL(timeout()), this, SLOT(updateTrajectory()));
     connect(scene(), SIGNAL(selectionChanged()), this, SLOT(updateSelection()));
-}
-
-void WorldView::clear() {
-    changeTrajectoryBase(0);
-    _itemControls->removeAllControls();
-    _objectViews.clear();
-    scene()->clear();
 }
 
 void WorldView::setSimulationMode(bool on, bool online) {
@@ -66,7 +60,8 @@ void WorldView::setSimulationMode(bool on, bool online) {
 
     for(auto &ov : _objectViews) {
         if(!on) ov->item->setPose(ov->waypoints[0]->pose());
-        if(!ov->waypoints.isEmpty()) ov->waypoints[0]->setVisible(on);
+        if(ov->object->motionType() == WorldObject::Trajectory
+                && !ov->waypoints.isEmpty()) ov->waypoints[0]->setVisible(on);
         ov->item->blockSignals(on);
     }
 
@@ -91,6 +86,15 @@ QString WorldView::defaultMessage() const {
     default:
         return "<b>Right drag:</b> scroll map";
     }
+}
+
+void WorldView::clear() {
+    changeTrajectoryBase(0);
+    _itemControls->removeAllControls();
+    _objectViews.clear();
+    scene()->clear();
+    _map = 0;
+    _scan = 0;
 }
 
 void WorldView::setInteractionMode(SimulationToolBox::Tool mode) {
@@ -332,9 +336,11 @@ void WorldView::updateSelection() {
 //-----------------------------------------------------------------------------
 
 void WorldView::setMap(const QPixmap &map) {
-    clear();
+    if(_map) delete _map;
+    if(_scan) delete _scan;
 
     _map = scene()->addPixmap(map);
+    _map->setZValue(0.0);
 
     _scan = new LaserScanItem();
     _scan->setZValue(1.0);
@@ -411,6 +417,12 @@ void WorldView::updateObject(WorldObject *object, int role, const QVariant &data
     case WorldModel::ShapePixmapRole:
         ov->item->setShapePixmap(data.value<QPixmap>());
         break;
+    case WorldModel::MotionRole: {
+        bool visible = data.toInt() == WorldObject::Trajectory;
+        for(auto *w : ov->waypoints) w->setVisible(visible);
+        for(auto *p : ov->paths) p->setVisible(visible);
+        break;
+    }
     default:
         return;
     }
@@ -476,13 +488,13 @@ void WorldView::removeWaypoint(WorldObject *object, int i) {
     delete ov->waypoints[i];
     ov->waypoints.removeAt(i);
 
-    if(i < ov->paths.size()) {
+    if(i > 0 && i == ov->paths.size()) {
+        delete ov->paths[i - 1];
+        ov->paths.removeAt(i - 1);
+    } else if(i < ov->paths.size()) {
         delete ov->paths[i];
         ov->paths.removeAt(i);
-    }
-
-    if(i > 0) {
-        setTempPath(ov, i - 1, i);
+        if(i > 0) setTempPath(ov, i - 1, i);
     }
 
     if(i == 0 && !ov->waypoints.isEmpty()) {

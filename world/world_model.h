@@ -1,12 +1,13 @@
 #ifndef WORLD_MODEL_H
 #define WORLD_MODEL_H
 
-#include <QGraphicsObject>
 #include <QVector3D>
 #include <QBrush>
 #include <QPen>
 #include <QHash>
 #include <QSettings>
+
+#include "project_file.h"
 
 // TODO:
 //   - WorldObject* should be replaced with QModelIndex in functions like
@@ -34,11 +35,25 @@ struct Pose {
         y += point.y();
         return *this;
     }
+
+    operator QVariant() const;
 };
+
+inline QDataStream &operator <<(QDataStream &stream, const Pose &pose) {
+    stream << pose.x << pose.y << pose.th;
+    return stream;
+}
+
+inline QDataStream &operator >>(QDataStream &stream, Pose &pose) {
+    stream >> pose.x >> pose.y >> pose.th;
+    return stream;
+}
 
 inline Pose operator+(const Pose &pose, const QPointF &point) {
     return Pose(pose.x + point.x(), pose.y + point.y(), pose.th);
 }
+
+Q_DECLARE_METATYPE(Pose)
 
 struct Path : public QVector<Pose> {
     Path() : QVector<Pose>(), ok(false) {}
@@ -69,8 +84,6 @@ public:
 
     WorldObject(Type type, const QString &id);
     virtual ~WorldObject() {}
-
-    virtual void save(QSettings &settings) const;
 
     QString id() const { return _id; }
     Type    type() const { return _type; }
@@ -131,8 +144,6 @@ class RobotObject : public WorldObject {
 public:
     RobotObject(const QString &id);
 
-    void save(QSettings &settings) const;
-
     bool isOdomNoiseEnabled() const { return _odomNoise; }
     double odomNoiseLinear() const { return _odomNoiseLin; }
     double odomNoiseAngular() const { return _odomNoiseAng; }
@@ -156,6 +167,9 @@ public:
     WorldModel(QObject *parent = 0);
     ~WorldModel();
 
+    bool save(ProjectFile &project) const;
+    bool load(ProjectFile &project);
+
     QList<WorldObject*> objects() const;
     QList<WorldObject*> robots() const;
 
@@ -165,9 +179,10 @@ public:
 //    QVariant data(WorldObject *object, DataRole role) const;
 
     bool setMap(const QString &fileName);
-    QString mapFileName()  const { return _mapFileName; }
-    QSizeF  mapWorldSize() const { return _map.size() * _worldScale; }
-    QSize   mapSizePix()   const { return _map.size(); }
+    const QPixmap &map() const { return _map; }
+
+    QSizeF mapWorldSize() const { return _map.size() * _worldScale; }
+    QSize mapSizePix() const { return _map.size(); }
 
     double worldScale() const { return _worldScale; }
     void setWorldScale(double val);
@@ -175,7 +190,7 @@ public:
     quint64 robotCount() const;
     quint64 obstacleCount() const;
 
-    void addObject(WorldObject::Type type, const QPointF &pos);
+    void addObject(WorldObject::Type type, const QPointF &pos, const QString &id = QString());
     void removeObject(WorldObject *object);
 
     void addWaypoint(WorldObject *object, const Pose &pose);
@@ -192,6 +207,7 @@ public:
     QPixmap pixmap(const WorldObject *object) const;
 
 signals:
+    void cleared();
     void mapChanged(const QPixmap &map);
     void objectCreated(WorldObject *object);
     void objectRemoved(WorldObject *object);
@@ -201,14 +217,19 @@ signals:
     void dataChanged(WorldObject *object, int role, const QVariant &value);
 
 private:
+    bool setMap(const QPixmap &pix);
+    QString generateId(WorldObject::Type type);
+    int createWaypoint(WorldObject *object, const Pose &pose);
     void updatePath(WorldObject *wo, int p1, int p2);
+
+    bool saveObject(const WorldObject *object, ProjectFile &project) const;
+    bool loadObject(ProjectFile &project);
 
     double _worldScale;
     quint64 _robotCount, _obstacleCount;
     QHash<QString, WorldObject*> _objects;
 
     QPixmap _map;
-    QString _mapFileName;
     PathPlanner *_planner;
 };
 

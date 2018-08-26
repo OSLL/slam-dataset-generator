@@ -13,8 +13,19 @@ static QList<QVariant> toVariantList(const QVector<T> &vec) {
     return res;
 }
 
+template<class T>
+static QList<QVariant> toVariantList(const QList<T> &list) {
+    return toVariantList<T>(list.toVector());
+}
+
 Pose Pose::toDegrees() const {
     return Pose(x, y, qRadiansToDegrees(th));
+}
+
+Pose::operator QVariant() const {
+    QVariant v;
+    v.setValue(*this);
+    return v;
 }
 
 //=============================================================================
@@ -27,30 +38,6 @@ WorldObject::WorldObject(Type type, const QString &id)
       _brush(type == Robot ? QColor(135, 206, 250) : Qt::blue)
 {
     _waypoints.append({0, 0, 0});
-}
-
-void WorldObject::save(QSettings &settings) const {
-    settings.setValue("id", _id);
-    settings.setValue("type", _type);
-    settings.setValue("motion", _motion);
-    settings.setValue("drive", _drive);
-    settings.setValue("speedLinear", _speedLin);
-    settings.setValue("speedAngular", _speedAng);
-//    settings.setValue("pose", pose());
-    settings.beginWriteArray("waypoints", _waypoints.size());
-    int i = 0;
-    for(auto wp : _waypoints) {
-        settings.setArrayIndex(i++);
-        settings.setValue("pose", wp.toVector3D());
-    }
-    settings.endArray();
-    settings.beginWriteArray("paths", _paths.size());
-//    i = 0;
-//    for(auto &p : _paths) {
-//        settings.setArrayIndex(i++);
-//        settings.setValue("path", toVariantList(p));
-//    }
-    settings.endArray();
 }
 
 double WorldObject::angularSpeedRad() const {
@@ -98,13 +85,6 @@ RobotObject::RobotObject(const QString &id)
     _origin = {0.0, 0.0};
 }
 
-void RobotObject::save(QSettings &settings) const {
-    WorldObject::save(settings);
-    settings.setValue("odomNoise", _odomNoise);
-    settings.setValue("odomNoiseLinear", _odomNoiseLin);
-    settings.setValue("odomNoiseAng", _odomNoiseAng);
-}
-
 //=============================================================================
 
 WorldModel::WorldModel(QObject *parent)
@@ -115,6 +95,56 @@ WorldModel::WorldModel(QObject *parent)
 
 WorldModel::~WorldModel() {
     clear();
+}
+
+bool WorldModel::save(ProjectFile &project) const {
+    auto *settings = project.settings();
+    if(!settings) return false;
+
+    if(!_map.isNull()) {
+        // TODO: mapId should be unique
+        QString mapId = "map";
+        project.addPixmap(mapId, _map);
+        settings->setValue("Map", mapId);
+    } else {
+        settings->remove("Map");
+    }
+
+    settings->setValue("WorldScale", _worldScale);
+    settings->beginWriteArray("Objects", _objects.size());
+    int i = 0;
+    for(auto *obj : _objects) {
+        settings->setArrayIndex(i++);
+        if(!saveObject(obj, project)) return false;
+    }
+    settings->endArray();
+
+    return true;
+}
+
+bool WorldModel::load(ProjectFile &project) {
+    clear();
+
+    if(!project.settings()) return false;
+    auto &settings = *project.settings();
+
+    auto mapFile = settings.value("Map").toString();
+    if(mapFile.isEmpty()) return false;
+    if(!setMap(project.getPixmap(mapFile))) return false;
+
+    _worldScale = settings.value("WorldScale", 0.1).toDouble();
+
+    int n = settings.beginReadArray("Objects");
+    for(int i = 0; i < n; ++i) {
+        settings.setArrayIndex(i);
+        if(!loadObject(project)) {
+            clear();
+            return false;
+        }
+    }
+    settings.endArray();
+
+    return true;
 }
 
 QList<WorldObject*> WorldModel::objects() const {
@@ -133,6 +163,9 @@ void WorldModel::clear() {
     _robotCount = _obstacleCount = 0;
     for(auto *obj : _objects) delete obj;
     _objects.clear();
+    _map = QPixmap();
+
+    emit cleared();
 }
 
 void WorldModel::setData(WorldObject *object, DataRole role, const QVariant &value) {
@@ -182,15 +215,7 @@ void WorldModel::setData(WorldObject *object, DataRole role, const QVariant &val
 }
 
 bool WorldModel::setMap(const QString &fileName) {
-    _map = QPixmap(fileName);
-    if(_map.isNull()) {
-        _mapFileName.clear();
-        return false;
-    }
-    _mapFileName = fileName;
-    _planner->setMap(_map);
-    emit mapChanged(_map);
-    return true;
+    return setMap(QPixmap(fileName));
 }
 
 void WorldModel::setWorldScale(double val) {
@@ -210,18 +235,18 @@ quint64 WorldModel::obstacleCount() const {
     return _objects.size() - robotCount();
 }
 
-void WorldModel::addObject(WorldObject::Type type, const QPointF &pos) {
-    QString id;
+void WorldModel::addObject(WorldObject::Type type, const QPointF &pos, const QString &id) {
     WorldObject *obj;
+
+    auto objId = id.isEmpty() ? generateId(type) : id;
+    if(objId.isEmpty()) return;
 
     switch(type) {
     case WorldObject::Robot:
-        id = QString("robot_%1").arg(_robotCount++);
-        obj = new RobotObject(id);
+        obj = new RobotObject(objId);
         break;
     case WorldObject::Obstacle:
-        id = QString("obstacle_%1").arg(_obstacleCount++);
-        obj = new WorldObject(type, id);
+        obj = new WorldObject(type, objId);
         obj->_size = {2.0, 2.0};
         obj->_origin = { obj->_size.width() / _worldScale / 2.0,
                          obj->_size.height() / _worldScale / 2.0 };
@@ -231,15 +256,13 @@ void WorldModel::addObject(WorldObject::Type type, const QPointF &pos) {
     }
 
     obj->setPose({pos.x(), pos.y(), 0});
-    _objects[obj->id()] = obj;
+    _objects[objId] = obj;
 
     emit objectCreated(obj);
 }
 
 void WorldModel::addWaypoint(WorldObject *object, const Pose &pose) {
-    int i = object->addWaypoint(pose);
-    emit waypointCreated(object, i);
-
+    int i = createWaypoint(object, pose);
     updateWaypoint(object, i);
 }
 
@@ -275,6 +298,35 @@ void WorldModel::updateAllTrajectories() {
     for(auto *obj : _objects) updateTrajectory(obj);
 }
 
+bool WorldModel::setMap(const QPixmap &pix) {
+    if(pix.isNull()) return false;
+    _map = pix;
+    _planner->setMap(_map);
+    emit mapChanged(_map);
+    return true;
+}
+
+QString WorldModel::generateId(WorldObject::Type type) {
+    while(true) {
+        QString id;
+        switch(type) {
+        case WorldObject::Robot: id = QString("robot_%1").arg(_robotCount++); break;
+        case WorldObject::Obstacle: id = QString("obstacle_%1").arg(_obstacleCount++); break;
+        default: return QString();
+        }
+
+        if(!_objects.contains(id)) return id;
+    }
+
+    return QString();
+}
+
+int WorldModel::createWaypoint(WorldObject *object, const Pose &pose) {
+    int i = object->addWaypoint(pose);
+    emit waypointCreated(object, i);
+    return i;
+}
+
 void WorldModel::updatePath(WorldObject *wo, int p1, int p2) {
     auto ps = wo->waypoint(p1).toVector3D();//waypointPose(wo->waypoint(p1));
     auto pg = wo->waypoint(p2).toVector3D();//waypointPose(wo->waypoint(p2));
@@ -289,6 +341,111 @@ void WorldModel::updatePath(WorldObject *wo, int p1, int p2) {
     }
 
     emit pathChanged(wo, p1);
+}
+
+bool WorldModel::saveObject(const WorldObject *object, ProjectFile &project) const {
+    auto &settings = *project.settings();
+
+    settings.setValue("Id",           object->_id);
+    settings.setValue("Type",         object->_type);
+    settings.setValue("Motion",       object->_motion);
+    settings.setValue("Drive",        object->_drive);
+    settings.setValue("SpeedLinear",  object->_speedLin);
+    settings.setValue("SpeedAngular", object->_speedAng);
+    settings.setValue("Size",         object->_size);
+    settings.setValue("Pose",         object->pose());
+    settings.setValue("Origin",       object->_origin);
+    settings.setValue("Brush",        object->_brush);
+    settings.setValue("Shape",        object->_shape);
+    settings.setValue("Waypoints",    toVariantList(object->_waypoints));
+
+    if(object->_shape == WorldObject::CustomShape) {
+        if(!project.addPixmap(object->_id, object->_shapePix)) return false;
+        settings.setValue("ShapePix", object->_id);
+    } else {
+        settings.remove("ShapePix");
+    }
+
+    settings.beginWriteArray("Paths", object->_paths.size());
+    int i = 0;
+    for(auto &p : object->_paths) {
+        settings.setArrayIndex(i++);
+        settings.setValue("Path", toVariantList(p));
+        settings.setValue("Ok", p.ok);
+    }
+    settings.endArray();
+
+    switch(object->_type) {
+    case WorldObject::Robot: {
+        auto *robot = static_cast<const RobotObject*>(object);
+        settings.setValue("OdomNoise", robot->_odomNoise);
+        settings.setValue("OdomNoiseLinear", robot->_odomNoiseLin);
+        settings.setValue("OdomNoiseAng", robot->_odomNoiseAng);
+        break;
+    }
+    default:
+        break;
+    }
+
+    return true;
+}
+
+bool WorldModel::loadObject(ProjectFile &project) {
+    auto &settings = *project.settings();
+
+    auto id = settings.value("Id").toString();
+    addObject(static_cast<WorldObject::Type>(settings.value("Type", -1).toInt()),
+              settings.value("Pose").value<Pose>().toPointF(), id);
+
+    auto *object = _objects[id];
+    if(!object) return false;
+
+    setData(object, MotionRole,   settings.value("Motion"));
+    setData(object, DriveRole,    settings.value("Drive"));
+    setData(object, SpeedLinRole, settings.value("SpeedLinear"));
+    setData(object, SpeedAngRole, settings.value("SpeedAngular"));
+    setData(object, SizeRole,     settings.value("Size"));
+    setData(object, OriginRole,   settings.value("Origin"));
+    setData(object, BrushRole,    settings.value("Brush"));
+    setData(object, ShapeRole,    settings.value("Shape"));
+
+    if(object->shapeType() == WorldObject::CustomShape) {
+        QPixmap pix = project.getPixmap(settings.value("ShapePix").toString());
+        if(pix.isNull()) return false;
+        setData(object, ShapePixmapRole, pix);
+    }
+
+    switch(object->type()) {
+    case WorldObject::Robot: {
+        setData(object, OdomNoiseRole,    settings.value("OdomNoise"));
+        setData(object, OdomNoiseLinRole, settings.value("OdomNoiseLinear"));
+        setData(object, OdomNoiseAngRole, settings.value("OdomNoiseAng"));
+        break;
+    }
+    default:
+        break;
+    }
+
+    auto wps = settings.value("Waypoints").toList();
+    for(auto wp = wps.begin() + 1; wp != wps.end(); ++wp) {
+        createWaypoint(object, wp->value<Pose>());
+    }
+
+    int pc = settings.beginReadArray("Paths");
+    for(int i = 0; i < pc; ++i) {
+        settings.setArrayIndex(i);
+        Path path;
+        path.ok = settings.value("Ok").toBool();
+        for(auto &pi : settings.value("Path").toList()) {
+            path.append(pi.value<Pose>());
+        }
+
+        object->setPath(i, path);
+        emit pathChanged(object, i);
+    }
+    settings.endArray();
+
+    return true;
 }
 
 void WorldModel::removeObject(WorldObject *object) {

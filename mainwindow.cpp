@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "project_file.h"
 
 #include <QMenuBar>
 #include <QMenu>
@@ -90,10 +91,95 @@ void MainWindow::loadMap(const QString &fileName) {
     _notifications->showInfo(_view->defaultMessage());
 }
 
+void MainWindow::loadProject(const QString &fileName) {
+    ProjectFile project;
+
+    switch(project.load(fileName)) {
+    case ProjectFile::IOError:
+        QMessageBox::critical(this, "Load project", "Unable to unpack file: " + fileName);
+        return;
+    case ProjectFile::Corrupted:
+        QMessageBox::critical(this, "Load project", "Unable to load project: file corrupted (" + fileName + ")");
+        return;
+    default:
+        break;
+    }
+
+    auto *settings = project.settings();
+    if(!settings) {
+        QMessageBox::critical(this, "Load project", "Unable to load project: " + fileName);
+        return;
+    }
+
+    settings->beginGroup("Simulation");
+    _simConfig->load(*settings);
+    settings->endGroup();
+
+    settings->beginGroup("Model");
+    if(!_model->load(project)) {
+        _view->setEnabled(false);
+        _notifications->showWarning("<b>Unable to load project</b>");
+        QMessageBox::critical(this, "Load project", "Unable to load project: file corrupted (" + fileName + ")");
+        return;
+    }
+    settings->endGroup();
+
+    _currentProject = fileName;
+    _notifications->showInfo("<b>Project loaded:</b> " + _currentProject);
+    _view->setEnabled(true);
+}
+
 void MainWindow::moveEvent(QMoveEvent *event) {
     auto d = event->pos() - event->oldPos();
     _objConfig->move(_objConfig->pos() + d);
     QMainWindow::moveEvent(event);
+}
+
+void MainWindow::openProject() {
+    auto fileName = QFileDialog::getOpenFileName(this, "Open project", "", "Dataset generator project (*.dgp)");
+    if(!fileName.isEmpty()) loadProject(fileName);
+}
+
+void MainWindow::saveProject() {
+    if(_currentProject.isEmpty()) {
+        saveProjectAs();
+        return;
+    }
+
+    ProjectFile project;
+
+    auto *settings = project.settings();
+    if(!settings) {
+        QMessageBox::critical(this, "Save project", "Unable to write file: " + _currentProject);
+        return;
+    }
+
+    settings->beginGroup("Simulation");
+    _simConfig->save(*settings);
+    settings->endGroup();
+
+    settings->beginGroup("Model");
+    if(!_model->save(project)) {
+        QMessageBox::critical(this, "Save project", "Unable to write file: " + _currentProject);
+        return;
+    }
+    settings->endGroup();
+
+    if(project.save(_currentProject) != ProjectFile::NoError) {
+        QMessageBox::critical(this, "Save project", "Unable to write file: " + _currentProject);
+        return;
+    }
+
+    _notifications->showInfo("<b>Project saved:</b> " + _currentProject);
+}
+
+void MainWindow::saveProjectAs() {
+    auto fileName = QFileDialog::getSaveFileName(this, "Save project", "", "Dataset generator project (*.dgp)");
+    if(fileName.isEmpty()) return;
+    else if(!fileName.endsWith(".dgp")) fileName += ".dgp";
+
+    _currentProject = fileName;
+    saveProject();
 }
 
 void MainWindow::openMap() {
@@ -142,7 +228,19 @@ void MainWindow::showObjectConfigDialog(WorldObject *object) {
 
 void MainWindow::createMenus() {
     QMenu *fileMenu = new QMenu("File", this);
-    fileMenu->addAction("Load map ...", this, SLOT(openMap()))
+    fileMenu->addAction("Open project ...", this, SLOT(openProject()))
             ->setShortcut(QKeySequence::Open);
+    fileMenu->addSeparator();
+    fileMenu->addAction("Save project", this, SLOT(saveProject()))
+            ->setShortcut(QKeySequence::Save);
+    fileMenu->addAction("Save project as ...", this, SLOT(saveProjectAs()));
+    fileMenu->addSeparator();
+    fileMenu->addAction("Exit", this, SLOT(close()))
+            ->setShortcut(QKeySequence::Quit);
     menuBar()->addMenu(fileMenu);
+
+    QMenu *editMenu = new QMenu("Edit", this);
+    editMenu->addAction("Set map ...", this, SLOT(openMap()))
+            ->setShortcut(Qt::CTRL + Qt::Key_M);
+    menuBar()->addMenu(editMenu);
 }

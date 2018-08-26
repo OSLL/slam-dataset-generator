@@ -19,12 +19,12 @@ class WorldView : public QGraphicsView {
 public:
     WorldView(WorldModel *model, QWidget *parent = 0);
 
-    void clear();
     void setSimulationMode(bool on, bool online = true);
 
     QString defaultMessage() const;
 
 public slots:
+    void clear();
     void setInteractionMode(SimulationToolBox::Tool mode);
     void setObjectPosition(const QString &id, const QVector3D &pos);
     void setRobotCrashed(bool on);

@@ -43,7 +43,7 @@ link_directories(/opt/ros/$ENV{ROS_DISTRO}/lib)
 include_directories(/opt/ros/$ENV{ROS_DISTRO}/include ${STAGE_INCLUDE_DIRS} ${OMPL_INCLUDE_DIRS})
 include_directories(world)
 add_executable(dataset_generator
-    main.cpp mainwindow.cpp widgets.cpp simulator.cpp stage_wrapper.cpp
+    main.cpp mainwindow.cpp widgets.cpp simulator.cpp stage_wrapper.cpp project_file.cpp
     world/world_model.cpp world/world_items.cpp world/world_view.cpp
     ${UI_HEADERS} ${UI_RESOURCES}
 )

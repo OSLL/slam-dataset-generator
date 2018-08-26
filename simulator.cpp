@@ -277,6 +277,49 @@ SimulatorConfig::SimulatorConfig(QWidget *parent) : QWidget(parent) {
     connect(_pbApply, SIGNAL(clicked(bool)), this, SLOT(applySettings()));
 }
 
+void SimulatorConfig::save(QSettings &settings) const {
+    settings.setValue("OutputEnabled",      isOutputEnabled());
+    settings.setValue("GTEnabled",          isGroundtruthEnabled());
+    settings.setValue("VisEnabled",         isVisualizationEnabled());
+    settings.setValue("LaserNoiseEnabled",  isLaserNoiseEnabled());
+    settings.setValue("OutputFile",         outputFileName());
+    settings.setValue("VisualizationRate",  visualizationRate());
+    settings.setValue("MapResolution",      mapResolution());
+    settings.setValue("SimInterval",        simInterval());
+    settings.setValue("MaxAvoidanceTries",  maxAvoidTries());
+    settings.setValue("LaserRangeMin",      laserRangeMin());
+    settings.setValue("LaserRangeMax",      laserRangeMax());
+    settings.setValue("LaserFOV",           laserFOV());
+    settings.setValue("LaserSamples",       laserSamples());
+    settings.setValue("LaserNoiseType",     laserNoiseType());
+    settings.setValue("LaserNoiseC",        laserNoiseConst());
+    settings.setValue("LaserNoiseP",        laserNoiseProp());
+    settings.setValue("LaserNoiseAng",      laserNoiseAngular());
+}
+
+void SimulatorConfig::load(QSettings &settings) {
+    setOutputFileName(settings.value("OutputFile").toString());
+
+    for(auto *w : findChildren<QWidget*>()) w->blockSignals(true);
+    _gbOutput->setChecked(settings.value("OutputEnabled", true).toBool());
+    _cbGroundtruth->setChecked(settings.value("GTEnabled", false).toBool());
+    _gbVisualization->setChecked(settings.value("VisEnabled", true).toBool());
+    _laserNoise->setChecked(settings.value("LaserNoiseEnabled", true).toBool());
+    setVisualizationRate(settings.value("VisualizationRate", 20).toInt());
+    setMapResolution(settings.value("MapResolution", 0.1).toDouble());
+    setSimInterval(settings.value("SimInterval", 100).toInt());
+    setMaxAvoidTries(settings.value("MaxAvoidanceTries", 10).toInt());
+    setLaserRangeMin(settings.value("LaserRangeMin", 0.0).toDouble());
+    setLaserRangeMax(settings.value("LaserRangeMax", 30.0).toDouble());
+    setLaserFOV(settings.value("LaserFOV", 270).toDouble());
+    setLaserSamples(settings.value("LaserSamples", 1081).toInt());
+    setLaserNoiseType(settings.value("LaserNoiseType", 0).toInt());
+    setLaserNoiseConst(settings.value("LaserNoiseC", 0.01).toDouble());
+    setLaserNoiseProp(settings.value("LaserNoiseP", 0.0).toDouble());
+    setLaserNoiseAngular(settings.value("LaserNoiseAng", 0.05).toDouble());
+    for(auto *w : findChildren<QWidget*>()) w->blockSignals(false);
+}
+
 void SimulatorConfig::setMapFileName(const QString &fileName) {
     QFileInfo fi(fileName);
     QString of = _outputFile->text();
@@ -401,7 +444,7 @@ void Simulator::ObjectState::setPath(const QVector<QVector3D> &p, bool align) {
 }
 
 Simulator::Simulator(const WorldModel *model, QObject *parent)
-    : QObject(parent), _stg(0), _bag(0), _gt(0), _model(model)
+    : QObject(parent), _stg(0), _bag(0), _gt(0), _model(model), _tmpDir(0)
 {
     _mapResolution = 0.1;
     _maxAvoidTries = 10;
@@ -411,6 +454,7 @@ Simulator::Simulator(const WorldModel *model, QObject *parent)
 }
 
 Simulator::~Simulator() {
+    delete _tmpDir;
 }
 
 void Simulator::simulate(const SimulatorConfig *config) {
@@ -433,20 +477,29 @@ void Simulator::simulate(const SimulatorConfig *config) {
         return;
     }
 
+    delete _tmpDir;
+    _tmpDir = new QTemporaryDir();
+    if(!_tmpDir->isValid()) {
+        qDebug() << "unable to create temporary dir";
+        return;
+    }
+
     auto worldConfig = generateWorldFile(config);
     if(worldConfig.isEmpty()) {
         qDebug() << "unable to generate world file";
         return;
     }
 
-    QTemporaryFile worldFile;
-    if(!worldFile.open()) {
-        qDebug() << "unable to open world file";
+    auto worldFilePath = tmpFilePath("config.world");
+
+    QFile worldFile(worldFilePath);
+    if(!worldFile.open(QFile::WriteOnly)) {
+        qDebug() << "unable to write world file";
         return;
     }
 
     worldFile.write(worldConfig.toLatin1());
-    worldFile.flush();
+    worldFile.close();
 
     _finished = false;
     _visual = config->isVisualizationEnabled();
@@ -489,7 +542,7 @@ void Simulator::simulate(const SimulatorConfig *config) {
     connect(_stg, SIGNAL(worldUpdated(StageWorldState)), this, SLOT(worldUpdated(StageWorldState)));
     connect(_stgTimer, SIGNAL(timeout()), _stg, SLOT(update()));
 
-    if(!_stg->load(worldFile.fileName())) {
+    if(!_stg->load(worldFilePath)) {
         qDebug() << "worldfile is invalid";
         return;
     }
@@ -666,12 +719,14 @@ QString Simulator::readTemplate(const QString &fileName) const {
     tmp.replace(name, QString::number(value));
 
 QString Simulator::generateWorldFile(const SimulatorConfig *config) const {
-    QString tmp = readTemplate(":/templates/world.template");
+    auto tmp = readTemplate(":/templates/world.template");
     if(tmp.isEmpty()) return QString();
 
-    QSizeF mapSize = _model->mapWorldSize();
+    auto mapSize = _model->mapWorldSize();
+    auto mapFileName = tmpFilePath("map.pgm");
+    if(!exportAsPgm(_model->map(), mapFileName)) return QString();
 
-    tmp.replace("<map_filename>",   _model->mapFileName());
+    tmp.replace("<map_filename>",   mapFileName);
     SET_PROPERTY("<rt_resolution>", _model->worldScale() / 2.0);
     SET_PROPERTY("<sim_interval>",  config->simInterval());
     SET_PROPERTY("<map_width>",     mapSize.width());
@@ -723,7 +778,7 @@ QString Simulator::generateObstacle(const WorldObject *object) const {
     switch(object->shapeType()) {
     case WorldObject::Ellipse:
     case WorldObject::CustomShape: {
-        auto fileName = QFileInfo(object->id() + ".pgm").absoluteFilePath();
+        auto fileName = tmpFilePath(object->id() + ".pgm");
         if(!exportAsPgm(_model->pixmap(object), fileName)) return QString();
         tmp.replace("<bitmap>", QString("bitmap \"%1\"").arg(fileName));
         break;
@@ -791,4 +846,8 @@ QString Simulator::driveTypeToString(WorldObject::Drive type) const {
     default: break;
     }
     return QString();
+}
+
+QString Simulator::tmpFilePath(const QString &fileName) const {
+    return _tmpDir ? _tmpDir->path() + "/" + fileName : fileName;
 }

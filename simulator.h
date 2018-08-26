@@ -12,6 +12,7 @@
 #include <QFile>
 #include <QHash>
 #include <QTextStream>
+#include <QTemporaryDir>
 
 #include <rosbag/bag.h>
 #include <geometry_msgs/TransformStamped.h>
@@ -123,6 +124,9 @@ public:
     Q_DECLARE_FLAGS(Options, Option)
 
     SimulatorConfig(QWidget *parent = 0);
+
+    void save(QSettings &settings) const;
+    void load(QSettings &settings);
 
     void setMapFileName(const QString &fileName);
 
@@ -252,6 +256,7 @@ private:
     QString generateObstacle(const WorldObject *object) const;
     QString generateRobot(const RobotObject *object, const SimulatorConfig *config) const;
     QString driveTypeToString(WorldObject::Drive type) const;
+    QString tmpFilePath(const QString &fileName) const;
 
     QPointF mapToStg(const QPointF &p) const;
     QVector3D mapToStg(const QVector3D &p) const;
@@ -267,6 +272,7 @@ private:
     GroundTruthWriter *_gt;
     QTimer *_stgTimer;
     const WorldModel *_model;
+    QTemporaryDir *_tmpDir;
 
     QHash<QString, ObjectState> _objects;
 

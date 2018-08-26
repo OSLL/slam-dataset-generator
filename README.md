@@ -145,7 +145,6 @@ See the [TUM file formats](https://vision.in.tum.de/data/datasets/rgbd-dataset/f
 
 The following major features are planned for implementation:
 
-* project saving and loading;
 * freehand trajectory drawing;
 * looped trajectories;
 * smart obstacle avoidance;

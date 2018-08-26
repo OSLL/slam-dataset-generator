@@ -16,11 +16,15 @@ public:
 
 public slots:
     void loadMap(const QString &fileName);
+    void loadProject(const QString &fileName);
 
 protected:
     void moveEvent(QMoveEvent *event);
 
 private slots:
+    void openProject();
+    void saveProject();
+    void saveProjectAs();
     void openMap();
     void simulate();
     void finishSimulation();
@@ -39,6 +43,7 @@ private:
     SimulationToolBox *_simTools;
     NotificationsWidget *_notifications;
     WorldObjectConfigWidget *_objConfig;
+    QString _currentProject;
 };
 
 
