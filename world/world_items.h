@@ -2,6 +2,8 @@
 #define WORLD_ITEMS_H
 
 #include <QGraphicsWidget>
+#include <QGraphicsLinearLayout>
+#include <QSignalMapper>
 
 #include "world_model.h"
 #include "simulator.h"
@@ -162,16 +164,19 @@ class WaypointControlItem : public WorldObjectControlItem {
     Q_OBJECT
 
 public:
-    WaypointControlItem(WorldObjectItem *item, QGraphicsItem *parent = 0);
+    WaypointControlItem(ControlType type, WorldObjectItem *item, QGraphicsItem *parent = 0);
+
+    void addButton(const QString &tooltip, const QIcon &icon, int id);
 
 signals:
-    void updatePathRequested();
-    void removeRequested();
+    void activated(int id);
 
 private slots:
     void adjustPos();
 
 private:
+    QSignalMapper *_mapper;
+    QGraphicsLinearLayout *_layout;
     QGraphicsWidget *_control;
 };
 
@@ -221,6 +226,25 @@ private:
 
 //=============================================================================
 
+class WorldObjectPathItem : public QGraphicsPathItem {
+public:
+    enum { Type = UserType + 3 };
+
+    WorldObjectPathItem(WorldObject *object, QGraphicsItem *parent = 0);
+
+    int type() const { return Type; }
+
+    WorldObject *object() const { return _object; }
+
+    void setHighlighted(bool on);
+
+private:
+    WorldObject *_object;
+    QGraphicsPathItem *_highlight;
+};
+
+//=============================================================================
+
 class LaserScanItem : public QGraphicsItem {
 public:
     LaserScanItem(QGraphicsItem *parent = 0);
@@ -235,6 +259,16 @@ private:
     QVector<QPointF> _scan;
     QColor _color;
     QRectF _boundingRect;
+};
+
+//=============================================================================
+
+class PointerItem : public QGraphicsItem {
+public:
+    PointerItem(QGraphicsItem *parent = 0);
+
+    QRectF boundingRect() const;
+    void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget);
 };
 
 #endif // WORLD_ITEMS_H

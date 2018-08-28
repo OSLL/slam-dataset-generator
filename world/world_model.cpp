@@ -48,9 +48,16 @@ void WorldObject::setPose(const Pose &pose) {
     _waypoints[0] = pose;
 }
 
-int WorldObject::addWaypoint(const Pose &pose) {
-    _waypoints.append(pose);
-    return _waypoints.size() - 1;
+int WorldObject::addWaypoint(const Pose &pose, int i) {
+    if(i < 0) {
+        _waypoints.append(pose);
+        _paths.append(Path());
+        return _waypoints.size() - 1;
+    }
+
+    _waypoints.insert(i, pose);
+    _paths.insert(i, Path());
+    return i;
 }
 
 void WorldObject::removeWaypoint(int i) {
@@ -70,8 +77,7 @@ QVector<QVector3D> WorldObject::path() const {
 }
 
 void WorldObject::setPath(int i, const Path &path) {
-    if(i == _paths.size()) _paths.append(path);
-    else _paths[i] = path;
+    _paths[i] = path;
 }
 
 //=============================================================================
@@ -262,7 +268,11 @@ void WorldModel::addObject(WorldObject::Type type, const QPointF &pos, const QSt
 }
 
 void WorldModel::addWaypoint(WorldObject *object, const Pose &pose) {
-    int i = createWaypoint(object, pose);
+    insertWaypoint(object, -1, pose);
+}
+
+void WorldModel::insertWaypoint(WorldObject *object, int i, const Pose &pose) {
+    i = createWaypoint(object, pose, i);
     updateWaypoint(object, i);
 }
 
@@ -294,6 +304,17 @@ void WorldModel::updateTrajectory(WorldObject *object) {
     }
 }
 
+void WorldModel::removeTrajectory(WorldObject *object) {
+    for(int i = object->waypointCount() - 1; i > 0; --i) {
+        emit waypointRemoved(object, i);
+    }
+
+    auto pose = object->pose();
+    object->_waypoints.clear();
+    object->_waypoints.append(pose);
+    object->_paths.clear();
+}
+
 void WorldModel::updateAllTrajectories() {
     for(auto *obj : _objects) updateTrajectory(obj);
 }
@@ -321,8 +342,8 @@ QString WorldModel::generateId(WorldObject::Type type) {
     return QString();
 }
 
-int WorldModel::createWaypoint(WorldObject *object, const Pose &pose) {
-    int i = object->addWaypoint(pose);
+int WorldModel::createWaypoint(WorldObject *object, const Pose &pose, int i) {
+    i = object->addWaypoint(pose, i);
     emit waypointCreated(object, i);
     return i;
 }

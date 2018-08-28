@@ -282,41 +282,40 @@ bool RobotControlItem::sceneEventFilter(QGraphicsItem *watched, QEvent *event) {
 
 //=============================================================================
 
-WaypointControlItem::WaypointControlItem(WorldObjectItem *item, QGraphicsItem *parent)
-    : WorldObjectControlItem(Waypoint, item, parent)
+WaypointControlItem::WaypointControlItem(ControlType type, WorldObjectItem *item, QGraphicsItem *parent)
+    : WorldObjectControlItem(type, item, parent)
 {
     connect(item, SIGNAL(poseChanged(QVector3D)), this, SLOT(adjustPos()));
     connect(item, SIGNAL(viewScaleChanged(double)), this, SLOT(adjustPos()));
 
     setFlag(ItemIgnoresTransformations);
 
-    auto *pbUpdatePlan = new QPushButton();
-    pbUpdatePlan->setIcon(QIcon(":/icons/update.png"));
-    pbUpdatePlan->setIconSize({12, 12});
-    pbUpdatePlan->setFixedSize(16, 16);
-//    pbUpdatePlan->setStyleSheet("background: transparent; border: none");
-    auto *uppw = new QGraphicsProxyWidget(this);
-    uppw->setWidget(pbUpdatePlan);
-    connect(pbUpdatePlan, SIGNAL(clicked(bool)), this, SIGNAL(updatePathRequested()));
-
-    auto *pbRemove = new QPushButton();
-    pbRemove->setIcon(QIcon(":/icons/remove.png"));
-    pbRemove->setIconSize({12, 12});
-    pbRemove->setFixedSize(16, 16);
-//    pbRemove->setStyleSheet("background: transparent; border: none");
-    auto *rpw = new QGraphicsProxyWidget(this);
-    rpw->setWidget(pbRemove);
-    connect(pbRemove, SIGNAL(clicked(bool)), this, SIGNAL(removeRequested()));
+    _mapper = new QSignalMapper(this);
+    connect(_mapper, SIGNAL(mapped(int)), this, SIGNAL(activated(int)));
 
     _control = new QGraphicsWidget(this);
     connect(_control, SIGNAL(geometryChanged()), this, SLOT(adjustPos()));
 
-    auto *l = new QGraphicsLinearLayout(Qt::Vertical);
-    l->addItem(uppw);
-    l->addItem(rpw);
-    l->setContentsMargins(0, 0, 0, 0);
-    l->setSpacing(2);
-    _control->setLayout(l);
+    _layout = new QGraphicsLinearLayout(Qt::Vertical);
+    _layout->setContentsMargins(0, 0, 0, 0);
+    _layout->setSpacing(2);
+    _control->setLayout(_layout);
+}
+
+void WaypointControlItem::addButton(const QString &tooltip, const QIcon &icon, int id) {
+    auto *btn = new QPushButton();
+    btn->setIcon(icon);
+    btn->setIconSize({12, 12});
+    btn->setFixedSize(16, 16);
+    btn->setToolTip(tooltip);
+
+    _mapper->setMapping(btn, id);
+    connect(btn, SIGNAL(clicked(bool)), _mapper, SLOT(map()));
+
+    auto *pw = new QGraphicsProxyWidget(this);
+    pw->setWidget(btn);
+
+    _layout->addItem(pw);
 }
 
 void WaypointControlItem::adjustPos() {
@@ -442,6 +441,29 @@ void ObstacleItem::paint(QPainter *painter) const {
 
 //=============================================================================
 
+WorldObjectPathItem::WorldObjectPathItem(WorldObject *object, QGraphicsItem *parent)
+    : QGraphicsPathItem(parent), _object(object), _highlight(0) {}
+
+void WorldObjectPathItem::setHighlighted(bool on) {
+    if(!on) {
+        delete _highlight;
+        _highlight = 0;
+        return;
+    }
+
+    if(_highlight) return;
+
+    QPen p(Qt::yellow, 2.5);
+//    p.setCosmetic(true);
+
+    _highlight = new QGraphicsPathItem(path(), this);
+    _highlight->setFlag(ItemStacksBehindParent);
+    _highlight->setOpacity(0.5);
+    _highlight->setPen(p);
+}
+
+//=============================================================================
+
 LaserScanItem::LaserScanItem(QGraphicsItem *parent) : QGraphicsItem(parent), _color(Qt::green) {
 }
 
@@ -471,4 +493,26 @@ void LaserScanItem::setLaserScan(const LaserScan &scan) {
 void LaserScanItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *) {
     painter->setPen(_color);
     painter->drawPoints(_scan.constData(), _scan.size());
+}
+
+//=============================================================================
+
+PointerItem::PointerItem(QGraphicsItem *parent) : QGraphicsItem(parent) {
+    setFlag(ItemIgnoresTransformations);
+}
+
+QRectF PointerItem::boundingRect() const {
+    return QRectF(-5, -5, 10, 10);
+}
+
+void PointerItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) {
+    QPen p(Qt::black, 1.2);
+    p.setCosmetic(true);
+
+    painter->setPen(p);
+    painter->drawEllipse({0, 0}, 2.5, 2.5);
+    painter->drawLine(-5, 0, -2.5, 0);
+    painter->drawLine(5, 0, 2.5, 0);
+    painter->drawLine(0, 5, 0, 2.5);
+    painter->drawLine(0, -5, 0, -2.5);
 }

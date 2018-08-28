@@ -10,7 +10,7 @@ The tool uses [Stage](https://github.com/rtv/Stage) as the underlying simulator.
 
 _**Warning:** the tool currently supports only raster maps and raster-based simulation (limitations of the underlying simulator)._
 
-_**Warning:** the tool is under heavy development so bugs or glitches are possible._
+_**Warning:** the tool is in active development so bugs or glitches are possible._
 
 ### Install
 
@@ -159,6 +159,10 @@ The following major features are planned for implementation:
 
 ##### Misc
 
-* Icons made by [Smashicons](https://www.flaticon.com/authors/smashicons) and [Gregor Cresnar](https://www.flaticon.com/authors/gregor-cresnar) from www.flaticon.com
+Icons made by 
+* [Smashicons](https://www.flaticon.com/authors/smashicons)
+* [Gregor Cresnar](https://www.flaticon.com/authors/gregor-cresnar)
+* [Freepik](http://www.freepik.com)
+from www.flaticon.com are licensed by [Creative Commons BY 3.0](http://creativecommons.org/licenses/by/3.0/)
 
 Copyright (c) 2018 JetBrains Research, Mobile Robot Algorithms Laboratory

@@ -198,7 +198,7 @@
        </property>
        <item>
         <property name="text">
-         <string>box</string>
+         <string>rect</string>
         </property>
        </item>
        <item>
@@ -316,12 +316,12 @@
         </item>
         <item>
          <property name="text">
-          <string>rand. speed</string>
+          <string>rnd. speed</string>
          </property>
         </item>
         <item>
          <property name="text">
-          <string>rand. pose</string>
+          <string>rnd. pose</string>
          </property>
         </item>
         <item>

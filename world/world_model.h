@@ -115,7 +115,7 @@ public:
 
 private:
     void setPose(const Pose &pose);
-    int addWaypoint(const Pose &pose);
+    int addWaypoint(const Pose &pose, int i = -1);
     void removeWaypoint(int i);
 
     void setWorldSize(const QSizeF &size) { _size = size; }
@@ -194,11 +194,13 @@ public:
     void removeObject(WorldObject *object);
 
     void addWaypoint(WorldObject *object, const Pose &pose);
+    void insertWaypoint(WorldObject *object, int i, const Pose &pose);
     void setWaypoint(WorldObject *object, int i, const Pose &pose);
     void removeWaypoint(WorldObject *object, int i);
     void updateWaypoint(WorldObject *object, int wpi);
 
     void updateTrajectory(WorldObject *object);
+    void removeTrajectory(WorldObject *object);
     void updateAllTrajectories();
 
     WorldObject *object(const QString &id);
@@ -219,7 +221,7 @@ signals:
 private:
     bool setMap(const QPixmap &pix);
     QString generateId(WorldObject::Type type);
-    int createWaypoint(WorldObject *object, const Pose &pose);
+    int createWaypoint(WorldObject *object, const Pose &pose, int i = -1);
     void updatePath(WorldObject *wo, int p1, int p2);
 
     bool saveObject(const WorldObject *object, ProjectFile &project) const;

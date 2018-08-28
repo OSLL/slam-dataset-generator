@@ -9,5 +9,6 @@
         <file>templates/robot.template</file>
         <file>icons/cube.png</file>
         <file>icons/route.png</file>
+        <file>icons/remove-trajectory.png</file>
     </qresource>
 </RCC>

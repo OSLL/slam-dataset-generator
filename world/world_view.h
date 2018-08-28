@@ -45,14 +45,16 @@ protected:
     void mouseReleaseEvent(QMouseEvent *event);
     void wheelEvent(QWheelEvent *event);
     void keyPressEvent(QKeyEvent *event);
+    void enterEvent(QEvent *event);
+    void leaveEvent(QEvent *event);
 
 private slots:
     void updateSelection();
     void updateObjectSize();
     void updateObjectOrigin();
+    void modifyWaypoint(int action);
     void updateWaypoint();
     void updateWaypointShape();
-    void removeWaypoint();
     void updateTrajectory();
     void updatePath();
 
@@ -65,6 +67,10 @@ private slots:
     void setPath(WorldObject *object, int i);
 
 private:
+    enum WaypointAction { RemoveWaypoint, UpdateWaypoint, RemoveTrajectory };
+
+    //-------------------------------------------------------------------------
+
     struct ObjectView {
         ObjectView(WorldObject *object = 0, WorldObjectItem *item = 0)
             : object(object), item(item) {}
@@ -72,7 +78,7 @@ private:
         WorldObject *object;
         WorldObjectItem *item;
         QList<WorldObjectItem*> waypoints;
-        QList<QGraphicsPathItem*> paths;
+        QList<WorldObjectPathItem*> paths;
     };
 
     //-------------------------------------------------------------------------
@@ -131,21 +137,25 @@ private:
 
     //-------------------------------------------------------------------------
 
+    void createDefaultControls();
+
     void checkPaths();
     void updatePath(WorldObjectItem *wp);
     void setTempPath(ObjectView *ov, int p1, int p2) const;
-    QGraphicsPathItem *createEmptyPath();
+    WorldObjectPathItem *createEmptyPath(WorldObject *object);
 
     void setTrajectoryMode(ObjectView *ov, bool on) const;
+    void setTrajectoryMode(WorldObjectItem *wpi, bool on) const;
     void changeTrajectoryBase(WorldObject *newBase);
 
     void addObject(WorldObject::Type type, const QPointF &pos);
     void removeObject(WorldObjectItem *woi);
 
-    void addWaypoint(WorldObject *object, const QPointF &scenePos);
+    void addWaypoint(WorldObject *object, int i, const QPointF &scenePos);
     bool isWaypoint(WorldObjectItem *item) const;
     Pose waypointPose(WorldObjectItem *wp) const;
     void removeWaypoint(WorldObjectItem *wp);
+    void removeTrajectory(WorldObjectItem *wp);
 
     WorldObject *baseObject(WorldObjectItem *item) const;
     WorldObjectItem *baseWaypoint(WorldObject *object) const;
@@ -153,6 +163,10 @@ private:
     ObjectView *senderItemView() const;
 
     QVector3D objectPose(const WorldObject *wo, int wpi = -1) const;
+
+    QPair<int, int> findWaypoints(WorldObjectPathItem *pathItem) const;
+
+    void snapCursor(const QMouseEvent *event, double snapR);
 
     // NOTE: uncomment if a model stores coordinates in the world scale
     inline QPointF mapToModel(const QPointF &p) const   { return p /* * _model->worldScale() */; }
@@ -168,9 +182,11 @@ private:
 
     QGraphicsPixmapItem *_map;
     LaserScanItem *_scan;
+    PointerItem *_pointer;
 
     WorldObject *_trajBase;
     DelayTimer *_trajUpdateTimer;
+    WorldObjectPathItem *_selectedPath;
     QSet<WorldObjectItem*> _selectedItems;
 
     ControlStack *_itemControls;

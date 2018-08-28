@@ -26,7 +26,7 @@ static double normalizedRotation(double angle) {
 //=============================================================================
 
 WorldView::WorldView(WorldModel *model, QWidget *parent)
-    : QGraphicsView(parent), _model(model), _map(0),
+    : QGraphicsView(parent), _model(model), _map(0), _trajBase(0), _selectedPath(0),
       _mode(SimulationToolBox::Navigation), _viewScale(1.0), _mousePressed(false)
 {
     setScene(new QGraphicsScene(this));
@@ -47,6 +47,8 @@ WorldView::WorldView(WorldModel *model, QWidget *parent)
 
     connect(_trajUpdateTimer, SIGNAL(timeout()), this, SLOT(updateTrajectory()));
     connect(scene(), SIGNAL(selectionChanged()), this, SLOT(updateSelection()));
+
+    createDefaultControls();
 }
 
 void WorldView::setSimulationMode(bool on, bool online) {
@@ -94,7 +96,8 @@ void WorldView::clear() {
     _objectViews.clear();
     scene()->clear();
     _map = 0;
-    _scan = 0;
+
+    createDefaultControls();
 }
 
 void WorldView::setInteractionMode(SimulationToolBox::Tool mode) {
@@ -104,6 +107,8 @@ void WorldView::setInteractionMode(SimulationToolBox::Tool mode) {
 
     switch(mode) {
     case SimulationToolBox::SetTrajectory: {
+        _pointer->setPos(mapToScene(mapFromGlobal(QCursor::pos())));
+
         auto items = scene()->selectedItems();
         if(items.size() != 1) break;
 
@@ -134,6 +139,16 @@ void WorldView::setInteractionMode(SimulationToolBox::Tool mode) {
         break;
     default:
         break;
+    }
+
+    if(mode == SimulationToolBox::SetTrajectory) {
+        _pointer->setVisible(_trajBase && underMouse());
+        setMouseTracking(true);
+    } else {
+        _pointer->setVisible(false);
+        if(_selectedPath) _selectedPath->setHighlighted(false);
+        _selectedPath = 0;
+        setMouseTracking(false);
     }
 
     if(!controlUpdated) scene()->clearSelection();
@@ -194,15 +209,20 @@ void WorldView::mouseDoubleClickEvent(QMouseEvent *event) {
 
     switch(_mode) {
     case SimulationToolBox::SetTrajectory:
-        if(_trajBase) addWaypoint(_trajBase, p);
+        if(!_trajBase) break;
+        if(_selectedPath) {
+            addWaypoint(_trajBase, findWaypoints(_selectedPath).second, _pointer->scenePos());
+        } else {
+            addWaypoint(_trajBase, -1, p);
+        }
         break;
     case SimulationToolBox::AddRobot:
         addObject(event->modifiers() == Qt::ControlModifier ? WorldObject::Obstacle
-                                                               : WorldObject::Robot, p);
+                                                            : WorldObject::Robot, p);
         break;
     case SimulationToolBox::AddObstacle:
         addObject(event->modifiers() == Qt::ControlModifier ? WorldObject::Robot
-                                                               : WorldObject::Obstacle, p);
+                                                            : WorldObject::Obstacle, p);
         break;
     default:
         break;
@@ -249,6 +269,10 @@ void WorldView::mousePressEvent(QMouseEvent *event) {
 }
 
 void WorldView::mouseMoveEvent(QMouseEvent *event) {
+    if(_mode == SimulationToolBox::SetTrajectory) {
+        snapCursor(event, 7.5);
+    }
+
     if(event->buttons() & Qt::RightButton) {
         // Copy of QGraphicsView src to avoid default cursor override
         auto *hBar = horizontalScrollBar();
@@ -304,6 +328,16 @@ void WorldView::keyPressEvent(QKeyEvent *event) {
     QGraphicsView::keyPressEvent(event);
 }
 
+void WorldView::enterEvent(QEvent *event) {
+    _pointer->setVisible(_trajBase && _mode == SimulationToolBox::SetTrajectory);
+    QGraphicsView::enterEvent(event);
+}
+
+void WorldView::leaveEvent(QEvent *event) {
+    _pointer->setVisible(false);
+    QGraphicsView::leaveEvent(event);
+}
+
 void WorldView::updateSelection() {
     QSet<WorldObjectItem*> newSelection;
     for(auto *item : scene()->selectedItems()) {
@@ -336,15 +370,9 @@ void WorldView::updateSelection() {
 //-----------------------------------------------------------------------------
 
 void WorldView::setMap(const QPixmap &map) {
-    if(_map) delete _map;
-    if(_scan) delete _scan;
-
+    delete _map;
     _map = scene()->addPixmap(map);
     _map->setZValue(0.0);
-
-    _scan = new LaserScanItem();
-    _scan->setZValue(1.0);
-    scene()->addItem(_scan);
 }
 
 void WorldView::createObject(WorldObject *object) {
@@ -389,6 +417,8 @@ void WorldView::removeObject(WorldObject *object) {
     if(object == _trajBase) changeTrajectoryBase(0);
     _itemControls->removeAllControls(ov->item);
     delete ov->item;
+    for(auto *wp : ov->waypoints) delete wp;
+    for(auto *p : ov->paths) delete p;
 
     _objectViews.remove(object);
 
@@ -458,14 +488,18 @@ void WorldView::createWaypoint(WorldObject *object, int i) {
         wpi->setShapePixmap(base->shapePixmap());
     }
     wpi->setShapeType(base->shapeType());
+    wpi->setVisible(object->motionType() == WorldObject::Trajectory);
+    setTrajectoryMode(wpi, object == _trajBase);
 
     scene()->addItem(wpi);
 
     ov->waypoints.insert(i, wpi);
     if(i > 0) {
-        ov->paths.insert(i - 1, createEmptyPath());
+        if(ov->paths.size() < i) {
+            ov->paths.insert(i - 1, createEmptyPath(object));
+        }
         if(i < object->waypointCount() - 1) {
-            ov->paths.insert(i, createEmptyPath());
+            ov->paths.insert(i, createEmptyPath(object));
         }
     }
 
@@ -495,6 +529,10 @@ void WorldView::removeWaypoint(WorldObject *object, int i) {
         delete ov->paths[i];
         ov->paths.removeAt(i);
         if(i > 0) setTempPath(ov, i - 1, i);
+    }
+
+    if(object->type() == WorldObject::Robot && ov->paths.isEmpty()) {
+        emit simulationAvailabilityChanged(false);
     }
 
     if(i == 0 && !ov->waypoints.isEmpty()) {
@@ -539,9 +577,11 @@ void WorldView::removeObject(WorldObjectItem *woi) {
     _model->removeObject(_objectViews[woi]->object);
 }
 
-void WorldView::addWaypoint(WorldObject *object, const QPointF &scenePos) {
+void WorldView::addWaypoint(WorldObject *object, int i, const QPointF &scenePos) {
     auto mapPos = mapToModel(_map->mapFromScene(scenePos));
-    _model->addWaypoint(object, {mapPos.x(), mapPos.y(), 0});
+    Pose pose = {mapPos.x(), mapPos.y(), 0};
+    if(i < 0) _model->addWaypoint(object, pose);
+    else _model->insertWaypoint(object, i, pose);
 }
 
 bool WorldView::isWaypoint(WorldObjectItem *item) const {
@@ -553,15 +593,15 @@ Pose WorldView::waypointPose(WorldObjectItem *wp) const {
     return {p.x(), p.y(), normalizedRotation(wp->rotation())};
 }
 
-void WorldView::removeWaypoint() {
-    auto *wp = qobject_cast<WaypointControlItem*>(sender());
-    if(wp) removeWaypoint(wp->controlledItem());
-}
-
 void WorldView::removeWaypoint(WorldObjectItem *wp) {
     auto *ov = _objectViews[wp->baseItem()];
     int i = ov->waypoints.indexOf(wp);
     if(i >= 0) _model->removeWaypoint(ov->object, i);
+}
+
+void WorldView::removeTrajectory(WorldObjectItem *wp) {
+    auto *wo = baseObject(wp);
+    if(wo) _model->removeTrajectory(wo);
 }
 
 //-----------------------------------------------------------------------------
@@ -583,6 +623,25 @@ void WorldView::updateObjectSize() {
 void WorldView::updateObjectOrigin() {
     auto *ov = senderItemView();
     if(ov) _model->setData(ov->object, WorldModel::OriginRole, mapToModel(ov->item->origin()));
+}
+
+void WorldView::modifyWaypoint(int action) {
+    auto *wpc = qobject_cast<WaypointControlItem*>(sender());
+    if(!wpc) return;
+
+    switch(action) {
+    case UpdateWaypoint:
+        updatePath(wpc->controlledItem());
+        break;
+    case RemoveWaypoint:
+        removeWaypoint(wpc->controlledItem());
+        break;
+    case RemoveTrajectory:
+        removeTrajectory(wpc->controlledItem());
+        break;
+    default:
+        break;
+    }
 }
 
 void WorldView::updateWaypoint() {
@@ -640,12 +699,6 @@ void WorldView::updateTrajectory() {
 }
 
 void WorldView::updatePath() {
-    auto *wpc = qobject_cast<WaypointControlItem*>(sender());
-    if(wpc) {
-        updatePath(wpc->controlledItem());
-        return;
-    }
-
     auto *wp = qobject_cast<WorldObjectItem*>(sender());
     if(!wp) return;
 
@@ -656,6 +709,20 @@ void WorldView::updatePath() {
     }
 
     updatePath(wp);
+}
+
+//-----------------------------------------------------------------------------
+
+void WorldView::createDefaultControls() {
+    _scan = new LaserScanItem();
+    _scan->setZValue(1.0);
+    _scan->setVisible(!isInteractive());
+    scene()->addItem(_scan);
+
+    _pointer = new PointerItem();
+    _pointer->setZValue(1.0);
+    _pointer->setVisible(false);
+    scene()->addItem(_pointer);
 }
 
 //-----------------------------------------------------------------------------
@@ -703,9 +770,10 @@ void WorldView::setTempPath(ObjectView *ov, int p1, int p2) const {
     pi->setPen(tmpTrajPen);
 }
 
-QGraphicsPathItem *WorldView::createEmptyPath() {
-    auto *path = new QGraphicsPathItem();
+WorldObjectPathItem *WorldView::createEmptyPath(WorldObject *object) {
+    auto *path = new WorldObjectPathItem(object);
     path->setZValue(0.1);
+    path->setVisible(object->motionType() == WorldObject::Trajectory);
     scene()->addItem(path);
     return path;
 }
@@ -713,14 +781,16 @@ QGraphicsPathItem *WorldView::createEmptyPath() {
 //-----------------------------------------------------------------------------
 
 void WorldView::setTrajectoryMode(ObjectView *ov, bool on) const {
-    for(auto *wpi : ov->waypoints) {
-        wpi->setFlag(QGraphicsItem::ItemIsSelectable, on);
-        wpi->setFlag(QGraphicsItem::ItemIsMovable, on);
-        wpi->setOpacity(on ? 1.0 : 0.25);
-    }
+    for(auto *wpi : ov->waypoints) setTrajectoryMode(wpi, on);
     if(on) _model->setData(ov->object, WorldModel::MotionRole, WorldObject::Trajectory);
     if(!ov->waypoints.isEmpty()) ov->waypoints.first()->setVisible(on);
     ov->item->setVisible(!on);
+}
+
+void WorldView::setTrajectoryMode(WorldObjectItem *wpi, bool on) const {
+    wpi->setFlag(QGraphicsItem::ItemIsSelectable, on);
+    wpi->setFlag(QGraphicsItem::ItemIsMovable, on);
+    wpi->setOpacity(on ? 1.0 : 0.25);
 }
 
 void WorldView::changeTrajectoryBase(WorldObject *newBase) {
@@ -739,6 +809,8 @@ void WorldView::changeTrajectoryBase(WorldObject *newBase) {
         setTrajectoryMode(_objectViews[newBase], true);
         _itemControls->addControl(baseWaypoint(newBase), WorldObjectControlItem::TrajectoryBase);
     }
+
+    _pointer->setVisible(_trajBase);
 }
 
 //-----------------------------------------------------------------------------
@@ -775,6 +847,87 @@ QVector3D WorldView::objectPose(const WorldObject *wo, int wpi) const {
     auto pose = wpi < 0 ? wo->pose() : wo->waypoint(wpi);
     auto pos = mapFromModel(pose.toPointF() - wo->origin());
     return QVector3D(pos.x(), pos.y(), pose.th);
+}
+
+QPair<int, int> WorldView::findWaypoints(WorldObjectPathItem *pathItem) const {
+    auto notFound = qMakePair(-1, -1);
+
+    auto *ov = _objectViews[pathItem->object()];
+    if(!ov) return notFound;
+
+    int i = 0;
+    for(auto *p : ov->paths) {
+        if(p == pathItem) return qMakePair(i, i + 1);
+        ++i;
+    }
+
+    return notFound;
+}
+
+//-----------------------------------------------------------------------------
+
+static QPointF nearestPoint(const QLineF &l, const QPointF &c) {
+    auto ax = l.x1() - c.x(), bx = l.x2() - c.x();
+    auto ay = l.y1() - c.y(), by = l.y2() - c.y();
+    auto a = (bx - ax) * (bx - ax) + (by - ay) * (by - ay);
+    auto b = 2.0 * (ax * (bx - ax) + ay * (by - ay));
+    auto t = -b / a / 2.0;
+
+    if(t < 0 || t > 1) {
+        return ax * ax + ay * ay < bx * bx + by * by ? l.p1() : l.p2();
+    }
+
+    return QPointF(l.x1() + t * (l.x2() - l.x1()), l.y1() + t * (l.y2() - l.y1()));
+}
+
+static inline double distSquared(const QPointF &p1, const QPointF &p2) {
+    auto dx = p1.x() - p2.x(), dy = p1.y() - p2.y();
+    return dx * dx + dy * dy;
+}
+
+void WorldView::snapCursor(const QMouseEvent *event, double snapR) {
+    QPointF pos = mapToScene(event->pos());
+
+    if(event->buttons() != Qt::NoButton) {
+        _pointer->setPos(pos);
+        if(_selectedPath) _selectedPath->setHighlighted(false);
+        return;
+    }
+
+    if(!_trajBase || event->modifiers() & Qt::ControlModifier) {
+        _pointer->setPos(pos);
+        return;
+    }
+
+    double minDist = snapR * snapR;
+    QPointF minPt;
+    WorldObjectPathItem *minPath = 0;
+
+    for(auto *item : items(QRect(event->pos().x() - snapR,
+                                 event->pos().y() - snapR,
+                                 2.0 * snapR, 2.0 * snapR)))
+    {
+        auto *pathItem = qgraphicsitem_cast<WorldObjectPathItem*>(item);
+        if(!pathItem || pathItem->object() != _trajBase) continue;
+
+        auto path = pathItem->path();
+        for(int i = 0; i < path.elementCount() - 1; ++i) {
+            auto p1 = path.elementAt(i), p2 = path.elementAt(i + 1);
+            auto p = nearestPoint(QLineF(p1.x, p1.y, p2.x, p2.y), pos);
+            auto d = distSquared(p, pos);
+            if(d < minDist) {
+                minPath = pathItem;
+                minDist = d;
+                minPt = p;
+            }
+        }
+    }
+
+    if(_selectedPath) _selectedPath->setHighlighted(false);
+    if(minPath) minPath->setHighlighted(true);
+
+    _selectedPath = minPath;
+    _pointer->setPos(minPath ? minPt : pos);
 }
 
 //-----------------------------------------------------------------------------
@@ -829,13 +982,31 @@ void WorldView::ControlStack::addControl(WorldObjectItem *item, WorldObjectContr
         _controls[item].append(control);
     }
 
-    if(type == WorldObjectControlItem::Waypoint) {
-        auto *wpc = new WaypointControlItem(item);
+    switch(type) {
+    case WorldObjectControlItem::Waypoint: {
+        auto *wpc = new WaypointControlItem(WorldObjectControlItem::Waypoint, item);
         wpc->setZValue(1.0);
-        connect(wpc, SIGNAL(updatePathRequested()), _view, SLOT(updatePath()));
-        connect(wpc, SIGNAL(removeRequested()), _view, SLOT(removeWaypoint()));
+        wpc->addButton("Replan path", QIcon(":/icons/update.png"),
+                       WaypointAction::UpdateWaypoint);
+        wpc->addButton("Remove waypoint", QIcon(":/icons/remove.png"),
+                       WaypointAction::RemoveWaypoint);
+        connect(wpc, SIGNAL(activated(int)), _view, SLOT(modifyWaypoint(int)));
         _view->scene()->addItem(wpc);
         _controls[item].append(wpc);
+        break;
+    }
+    case WorldObjectControlItem::TrajectoryBase: {
+        auto *wpc = new WaypointControlItem(WorldObjectControlItem::TrajectoryBase, item);
+        wpc->setZValue(1.0);
+        wpc->addButton("Remove trajectory", QIcon(":/icons/remove-trajectory.png"),
+                       WaypointAction::RemoveTrajectory);
+        connect(wpc, SIGNAL(activated(int)), _view, SLOT(modifyWaypoint(int)));
+        _view->scene()->addItem(wpc);
+        _controls[item].append(wpc);
+        break;
+    }
+    default:
+        break;
     }
 }
 
