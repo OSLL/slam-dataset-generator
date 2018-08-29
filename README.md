@@ -163,6 +163,7 @@ Icons made by
 * [Smashicons](https://www.flaticon.com/authors/smashicons)
 * [Gregor Cresnar](https://www.flaticon.com/authors/gregor-cresnar)
 * [Freepik](http://www.freepik.com)
+
 from www.flaticon.com are licensed by [Creative Commons BY 3.0](http://creativecommons.org/licenses/by/3.0/)
 
 Copyright (c) 2018 JetBrains Research, Mobile Robot Algorithms Laboratory

@@ -7,8 +7,6 @@
 #include <QPen>
 #include <QtMath>
 
-#include <cmath>
-
 #include <QDebug>
 
 static QPen cosmeticPen(const QBrush &brush) {
@@ -16,18 +14,18 @@ static QPen cosmeticPen(const QBrush &brush) {
     p.setCosmetic(true);
     return p;
 }
-
+/*
 static double normalizedRotation(double angle) {
     angle = std::fmod(angle + 180.0, 360.0);
     angle += angle < 0 ? 360.0 : -180.0;
     return qDegreesToRadians(angle);
 }
-
+*/
 //=============================================================================
 
 WorldView::WorldView(WorldModel *model, QWidget *parent)
     : QGraphicsView(parent), _model(model), _map(0), _trajBase(0), _selectedPath(0),
-      _mode(SimulationToolBox::Navigation), _viewScale(1.0), _mousePressed(false)
+      _mode(Navigation), _viewScale(1.0), _mousePressed(false)
 {
     setScene(new QGraphicsScene(this));
     setInteractive(true);
@@ -70,7 +68,7 @@ void WorldView::setSimulationMode(bool on, bool online) {
     for(auto *r : robots) r->setVisible(!on || online);
     _scan->setVisible(on && online);
 
-    if(!on && _trajBase && _mode == SimulationToolBox::SetTrajectory) {
+    if(!on && _trajBase && _mode == SetTrajectory) {
         setTrajectoryMode(_objectViews[_trajBase], true);
     }
 
@@ -79,11 +77,11 @@ void WorldView::setSimulationMode(bool on, bool online) {
 
 QString WorldView::defaultMessage() const {
     switch(_mode) {
-    case SimulationToolBox::AddRobot:
+    case AddRobot:
         return "<b>Left double click:</b> add robot <b>Ctrl + Left double click:</b> add obstacle <b>Right click:</b> edit object's trajectory";
-    case SimulationToolBox::AddObstacle:
+    case AddObstacle:
         return "<b>Left double click:</b> add obstacle <b>Ctrl + Left double click:</b> add robot <b>Right click:</b> edit object's trajectory";
-    case SimulationToolBox::SetTrajectory:
+    case SetTrajectory:
         return "<b>Select</b> item to start trajectory editing <b>Left double click:</b> add waypoint";
     default:
         return "<b>Right drag:</b> scroll map";
@@ -100,13 +98,13 @@ void WorldView::clear() {
     createDefaultControls();
 }
 
-void WorldView::setInteractionMode(SimulationToolBox::Tool mode) {
+void WorldView::setInteractionMode(InteractionMode mode) {
     if(_mode == mode) return;
 
     bool controlUpdated = false;
 
     switch(mode) {
-    case SimulationToolBox::SetTrajectory: {
+    case SetTrajectory: {
         _pointer->setPos(mapToScene(mapFromGlobal(QCursor::pos())));
 
         auto items = scene()->selectedItems();
@@ -120,9 +118,9 @@ void WorldView::setInteractionMode(SimulationToolBox::Tool mode) {
         controlUpdated = true;
         break;
     }
-    case SimulationToolBox::AddRobot:
-    case SimulationToolBox::AddObstacle:
-        if(_mode == SimulationToolBox::SetTrajectory && _trajBase) {
+    case AddRobot:
+    case AddObstacle:
+        if(_mode == SetTrajectory && _trajBase) {
             auto *prevOV = _objectViews[_trajBase];
             changeTrajectoryBase(0);
 
@@ -133,7 +131,7 @@ void WorldView::setInteractionMode(SimulationToolBox::Tool mode) {
             emit objectSelected(prevOV->object);
         }
         break;
-    case SimulationToolBox::Navigation:
+    case Navigation:
         _itemControls->removeAllControls();
         changeTrajectoryBase(0);
         break;
@@ -141,7 +139,7 @@ void WorldView::setInteractionMode(SimulationToolBox::Tool mode) {
         break;
     }
 
-    if(mode == SimulationToolBox::SetTrajectory) {
+    if(mode == SetTrajectory) {
         _pointer->setVisible(_trajBase && underMouse());
         setMouseTracking(true);
     } else {
@@ -157,7 +155,7 @@ void WorldView::setInteractionMode(SimulationToolBox::Tool mode) {
     emit message(NotificationsWidget::Info, defaultMessage());
 }
 
-void WorldView::setObjectPosition(const QString &id, const QVector3D &pos) {
+void WorldView::setObjectPosition(const QString &id, const Pose &pos) {
     auto *ov = _objectViews[_model->object(id)];
     if(!ov) return;
 
@@ -173,7 +171,7 @@ void WorldView::setObjectPosition(const QString &id, const QVector3D &pos) {
         item->setPos(pos.toPointF() - item->origin() - d);
     }
 
-    item->setRotation(qRadiansToDegrees(pos.z()));
+    item->setRotation(pos.th.deg());
 }
 
 void WorldView::setRobotCrashed(bool on) {
@@ -208,7 +206,7 @@ void WorldView::mouseDoubleClickEvent(QMouseEvent *event) {
     auto p = mapToScene(event->pos());
 
     switch(_mode) {
-    case SimulationToolBox::SetTrajectory:
+    case SetTrajectory:
         if(!_trajBase) break;
         if(_selectedPath) {
             addWaypoint(_trajBase, findWaypoints(_selectedPath).second, _pointer->scenePos());
@@ -216,11 +214,11 @@ void WorldView::mouseDoubleClickEvent(QMouseEvent *event) {
             addWaypoint(_trajBase, -1, p);
         }
         break;
-    case SimulationToolBox::AddRobot:
+    case AddRobot:
         addObject(event->modifiers() == Qt::ControlModifier ? WorldObject::Obstacle
                                                             : WorldObject::Robot, p);
         break;
-    case SimulationToolBox::AddObstacle:
+    case AddObstacle:
         addObject(event->modifiers() == Qt::ControlModifier ? WorldObject::Robot
                                                             : WorldObject::Obstacle, p);
         break;
@@ -240,19 +238,19 @@ void WorldView::mousePressEvent(QMouseEvent *event) {
     }
 
     switch(_mode) {
-    case SimulationToolBox::AddRobot:
-    case SimulationToolBox::AddObstacle:
-    case SimulationToolBox::Navigation:
+    case AddRobot:
+    case AddObstacle:
+    case Navigation:
         if(event->button() == Qt::RightButton) {
             auto *wo = baseObject(woi);
             if(wo) {
-                emit changeTool(SimulationToolBox::SetTrajectory);
+                emit changeTool(SetTrajectory);
                 changeTrajectoryBase(wo);
                 return;
             }
         }
         break;
-    case SimulationToolBox::SetTrajectory:
+    case SetTrajectory:
         if(event->button() == Qt::LeftButton) {
             auto *wo = baseObject(woi);
             if(wo && wo != _trajBase) {
@@ -269,7 +267,7 @@ void WorldView::mousePressEvent(QMouseEvent *event) {
 }
 
 void WorldView::mouseMoveEvent(QMouseEvent *event) {
-    if(_mode == SimulationToolBox::SetTrajectory) {
+    if(_mode == SetTrajectory) {
         snapCursor(event, 7.5);
     }
 
@@ -307,11 +305,11 @@ void WorldView::keyPressEvent(QKeyEvent *event) {
     switch(event->key()) {
     case Qt::Key_Escape:
         switch(_mode) {
-        case SimulationToolBox::AddRobot:
-        case SimulationToolBox::AddObstacle:
+        case AddRobot:
+        case AddObstacle:
             scene()->clearSelection();
             break;
-        case SimulationToolBox::SetTrajectory:
+        case SetTrajectory:
             scene()->clearSelection();
             changeTrajectoryBase(0);
             break;
@@ -329,7 +327,7 @@ void WorldView::keyPressEvent(QKeyEvent *event) {
 }
 
 void WorldView::enterEvent(QEvent *event) {
-    _pointer->setVisible(_trajBase && _mode == SimulationToolBox::SetTrajectory);
+    _pointer->setVisible(_trajBase && _mode == SetTrajectory);
     QGraphicsView::enterEvent(event);
 }
 
@@ -504,14 +502,14 @@ void WorldView::createWaypoint(WorldObject *object, int i) {
     }
 
     if(i == 0) {
-        connect(base, SIGNAL(poseChanged(QVector3D)), wpi, SLOT(setPose(QVector3D)));
+        connect(base, SIGNAL(poseChanged(Pose)), wpi, SLOT(setPose(Pose)));
         wpi->setVisible(false);
     }
 
     connect(base, SIGNAL(sizeChanged(QSizeF)), wpi, SLOT(setSize(QSizeF)));
     connect(base, SIGNAL(brushChanged(QBrush)), wpi, SLOT(setBrush(QBrush)));
     connect(base, SIGNAL(originChanged(QPointF)), wpi, SLOT(setOrigin(QPointF)));
-    connect(wpi, SIGNAL(poseChanged(QVector3D)), this, SLOT(updateWaypoint()));
+    connect(wpi, SIGNAL(poseChanged(Pose)), this, SLOT(updateWaypoint()));
     connect(wpi, SIGNAL(poseEdited()), this, SLOT(updatePath()));
 }
 
@@ -536,7 +534,7 @@ void WorldView::removeWaypoint(WorldObject *object, int i) {
     }
 
     if(i == 0 && !ov->waypoints.isEmpty()) {
-        connect(ov->item, SIGNAL(poseChanged(QVector3D)), ov->waypoints[0], SLOT(setPose(QVector3D)));
+        connect(ov->item, SIGNAL(poseChanged(Pose)), ov->waypoints[0], SLOT(setPose(Pose)));
         _itemControls->addControl(ov->waypoints[0], WorldObjectControlItem::TrajectoryBase);
     }
 }
@@ -579,7 +577,7 @@ void WorldView::removeObject(WorldObjectItem *woi) {
 
 void WorldView::addWaypoint(WorldObject *object, int i, const QPointF &scenePos) {
     auto mapPos = mapToModel(_map->mapFromScene(scenePos));
-    Pose pose = {mapPos.x(), mapPos.y(), 0};
+    Pose pose(mapPos.x(), mapPos.y());
     if(i < 0) _model->addWaypoint(object, pose);
     else _model->insertWaypoint(object, i, pose);
 }
@@ -590,7 +588,7 @@ bool WorldView::isWaypoint(WorldObjectItem *item) const {
 
 Pose WorldView::waypointPose(WorldObjectItem *wp) const {
     auto p = mapToModel(_map->mapFromScene(wp->sceneOrigin()));
-    return {p.x(), p.y(), normalizedRotation(wp->rotation())};
+    return {p.x(), p.y(), Degrees(wp->rotation()).normalized()};
 }
 
 void WorldView::removeWaypoint(WorldObjectItem *wp) {
@@ -843,10 +841,10 @@ WorldView::ObjectView *WorldView::senderItemView() const {
     return _objectViews[i];
 }
 
-QVector3D WorldView::objectPose(const WorldObject *wo, int wpi) const {
+Pose WorldView::objectPose(const WorldObject *wo, int wpi) const {
     auto pose = wpi < 0 ? wo->pose() : wo->waypoint(wpi);
     auto pos = mapFromModel(pose.toPointF() - wo->origin());
-    return QVector3D(pos.x(), pos.y(), pose.th);
+    return Pose(pos.x(), pos.y(), pose.th);
 }
 
 QPair<int, int> WorldView::findWaypoints(WorldObjectPathItem *pathItem) const {

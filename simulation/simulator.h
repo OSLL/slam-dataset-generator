@@ -3,11 +3,6 @@
 
 #include <QObject>
 #include <QVector>
-#include <QVector3D>
-#include <QRectF>
-#include <QSizeF>
-#include <QPixmap>
-#include <QImage>
 #include <QTimer>
 #include <QFile>
 #include <QHash>
@@ -17,42 +12,9 @@
 #include <rosbag/bag.h>
 #include <geometry_msgs/TransformStamped.h>
 
-#include <ompl/base/spaces/SE2StateSpace.h>
-#include <ompl/geometric/SimpleSetup.h>
-
 #include "stage_wrapper.h"
 #include "world_model.h"
 #include "ui_simulator_config.h"
-
-struct LaserScan {
-    QVector3D pose;
-    QVector<double> ranges;
-    float minRange, maxRange;
-    float minAngle, maxAngle;
-    float angleIncrement;
-};
-
-//=============================================================================
-
-class PathPlanner : public QObject {
-public:
-    PathPlanner(QObject *parent = 0);
-    ~PathPlanner();
-
-    QVector<QVector3D> makePlan(const QVector3D &start, const QVector3D &goal);
-
-    void setMap(const QPixmap &map);
-    void setRobotSize(const QSizeF &size);
-
-private:
-    bool isStateValid(const ompl::base::State *state) const;
-    bool isValidPixel(int x, int y) const;
-
-    QRectF _robot;
-    QImage _map;
-};
-
-//=============================================================================
 
 class BagWriter : public QObject {
 public:
@@ -66,7 +28,7 @@ public:
     void close();
 
     void writeLaserScan(double time, const LaserScan &scan);
-    void writeRobotPose(double time, const QVector3D &pose);
+    void writeRobotPose(double time, const Pose &pose);
 
 private:
     geometry_msgs::Transform createTransform(double x, double y, double th) const;
@@ -90,7 +52,7 @@ public:
     bool open(const QString &fileName);
     void close();
 
-    void writeRobotPose(double time, const QVector3D &pose);
+    void writeRobotPose(double time, const Pose &pose);
 
 private:
     ros::Time _time;
@@ -180,28 +142,28 @@ class PathTracker : public QObject {
 
 public:
     PathTracker(QObject *parent = 0);
-    PathTracker(const QVector<QVector3D> &path, bool align, QObject *parent = 0);
+    PathTracker(const Path &path, bool align, QObject *parent = 0);
 
-    void init(const QVector<QVector3D> &path, bool align);
+    void init(const Path &path, bool align);
 
     bool hasNextPoint() const;
-    QVector3D nextPoint();
+    Pose nextPoint();
 
     void ignoreNextPoint() { _ignoreNextPoint = true; }
     int ignoreCount() const { return _ignoreCount; }
 
-    float updateProgress(const QVector3D &pos);
+    float updateProgress(const Pose &pos);
 
 signals:
     void progress(int val) const;
 
 private:
-    double distance(const QVector3D &p1, const QVector3D &p2) const;
-    QVector3D alignedTo(const QVector3D &p1, const QVector3D &p2) const;
+    double distance(const Pose &p1, const Pose &p2) const;
+    Pose alignedTo(const Pose &p1, const Pose &p2) const;
 
-    QVector<QVector3D> _path;
+    Path _path;
     QVector<int> _waypointIdxs;
-    QVector3D _currentPoint;
+    Pose _currentPoint;
     int _curIdx;
 
     bool _ignoreNextPoint, _alignPath;
@@ -225,8 +187,7 @@ public:
     void stop();
 
 signals:
-    void positionChanged(const QVector3D &newPos);
-    void positionChanged(const QString &id, const QVector3D &newPos);
+    void positionChanged(const QString &id, const Pose &newPos);
     void scanChanged(const LaserScan &scan);
     void robotCrashed(bool on);
     void simulationProgress(int value);
@@ -234,21 +195,22 @@ signals:
 
 private slots:
     void goalReached(const QString &id = "robot");
-    void objectStalled(const QString &id, const QVector3D &pose);
+    void objectStalled(const QString &id, const Pose &pose);
     void worldUpdated(const StageWorldState &s);
 
 private:
     struct ObjectState {
         ObjectState(WorldObject *object = 0,
-                    const QVector3D &pose = QVector3D(),
-                    const QVector<QVector3D> &path = QVector<QVector3D>());
+                    const Pose &pose = Pose(),
+                    const Path &path = Path());
         ~ObjectState();
 
-        void setPath(const QVector<QVector3D> &p, bool align);
+        void setPath(const Path &p, bool align);
 
         WorldObject *object;
         PathTracker *path;
-        QVector3D pose, speed;
+        Pose pose;
+        Speed speed;
     };
 
     QString readTemplate(const QString &fileName) const;
@@ -259,12 +221,11 @@ private:
     QString tmpFilePath(const QString &fileName) const;
 
     QPointF mapToStg(const QPointF &p) const;
-    QVector3D mapToStg(const QVector3D &p) const;
-    QVector3D mapToStg(const Pose &p) const;
-    QVector3D mapFromStg(const QVector3D &p) const;
+    Pose mapToStg(const Pose &p) const;
+    Pose mapFromStg(const Pose &p) const;
 
     ObjectState *stateById(const QString &id);
-    QVector3D randomOffset(double maxX, double maxY, double maxTh = 0) const;
+    Pose randomOffset(double maxX, double maxY, double maxTh = 0) const;
     double randomValue(double maxVal) const;
 
     StageWrapper *_stg;

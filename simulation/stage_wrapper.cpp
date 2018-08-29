@@ -1,16 +1,13 @@
 #include "stage_wrapper.h"
-#include "world_model.h"
 
 #include "stage.hh"
 
-#include <QDebug>
-
-static inline QVector3D qtPose(const Stg::Pose &p) {
-    return QVector3D(p.x, p.y, p.a);
+static inline Pose qtPose(const Stg::Pose &p) {
+    return Pose(p.x, p.y, Radians(p.a));
 }
 
-static inline QVector3D qtVel(const Stg::Velocity &v) {
-    return QVector3D(v.x, v.y, v.a);
+static inline Speed qtVel(const Stg::Velocity &v) {
+    return Speed(v.x, v.y, Radians(v.a));
 }
 
 static inline double absMin(double a, double b) {
@@ -69,19 +66,15 @@ void StageWrapper::update() {
     _world->Update();
 }
 
-void StageWrapper::moveTo(const QString &id, const QVector3D &goal) {
-    moveTo(id, goal.x(), goal.y(), goal.z());
-}
-
-void StageWrapper::moveTo(const QString &id, double x, double y, double th) {
+void StageWrapper::moveTo(const QString &id, const Pose &goal) {
     StageObject *obj = objectById(id);
     if(!obj) return;
-    qDebug() << "object" << id << "is going from" << qtPose(obj->model->GetPose()) << "to" << QVector3D(x, y, th);
-    obj->goal.setGoalPos(x, y, th);
+    qDebug() << "object" << id << "is going from" << qtPose(obj->model->GetPose()) << "to" << goal;
+    obj->goal.setGoalPose(goal);
 }
 
-void StageWrapper::setSpeed(const QString &id, const QVector3D &speed, int timeMs) {
-    setSpeed(id, speed.x(), speed.y(), speed.z(), timeMs);
+void StageWrapper::setSpeed(const QString &id, const Speed &speed, int timeMs) {
+    setSpeed(id, speed.x, speed.y, speed.th.rad(), timeMs);
 }
 
 void StageWrapper::setSpeed(const QString &id, double x, double y, double a, int timeMs) {
@@ -182,7 +175,7 @@ StageObjectState StageWrapper::createState(const Stg::ModelPosition *m, bool sca
     state.gtPose = qtPose(m->GetPose());
     state.estOrig = qtPose(m->est_origin);
     state.estPose = qtPose(m->est_pose);
-    state.laserPose = QVector3D();
+    state.laserPose = Pose();
     state.speed = qtVel(m->GetVelocity());
 
     if(scan) {

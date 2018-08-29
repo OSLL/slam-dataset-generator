@@ -1,13 +1,12 @@
 #ifndef WORLD_MODEL_H
 #define WORLD_MODEL_H
 
-#include <QVector3D>
 #include <QBrush>
-#include <QPen>
+#include <QPixmap>
 #include <QHash>
-#include <QSettings>
 
 #include "project_file.h"
+#include "data_structures.h"
 
 // TODO:
 //   - WorldObject* should be replaced with QModelIndex in functions like
@@ -18,61 +17,6 @@
 //   - should object pixmaps be retrieved from WorldObjectItem?
 
 class PathPlanner;
-
-struct Pose {
-    Pose() : x(0), y(0), th(0) {}
-    Pose(double x, double y, double th) : x(x), y(y), th(th) {}
-
-    double x, y, th;
-
-    QPointF toPointF() const { return QPointF(x, y); }
-    QVector3D toVector3D() const { return QVector3D(x, y, th); }
-
-    Pose toDegrees() const;
-
-    Pose &operator +=(const QPointF &point) {
-        x += point.x();
-        y += point.y();
-        return *this;
-    }
-
-    operator QVariant() const;
-};
-
-inline QDataStream &operator <<(QDataStream &stream, const Pose &pose) {
-    stream << pose.x << pose.y << pose.th;
-    return stream;
-}
-
-inline QDataStream &operator >>(QDataStream &stream, Pose &pose) {
-    stream >> pose.x >> pose.y >> pose.th;
-    return stream;
-}
-
-inline Pose operator+(const Pose &pose, const QPointF &point) {
-    return Pose(pose.x + point.x(), pose.y + point.y(), pose.th);
-}
-
-Q_DECLARE_METATYPE(Pose)
-
-struct Path : public QVector<Pose> {
-    Path() : QVector<Pose>(), ok(false) {}
-    Path(const QVector<Pose> &other, bool ok) : QVector<Pose>(other), ok(ok) {}
-    Path(const QVector<QVector3D> &other, bool ok) : QVector<Pose>(other.size()), ok(ok) {
-        int i = 0;
-        for(auto &v : other) (*this)[i++] = {v.x(), v.y(), v.z()};
-    }
-
-    QVector<QVector3D> toVector3D() const {
-        QVector<QVector3D> res;
-        for(auto &p : *this) res.append(p.toVector3D());
-        return res;
-    }
-
-    bool ok;
-};
-
-//=============================================================================
 
 class WorldObject {
     friend class WorldModel;
@@ -104,7 +48,7 @@ public:
 
     const QBrush &brush() const { return _brush; }
 
-    QVector<QVector3D> path() const;
+    Path path() const;
     const Path &path(int i) const { return _paths[i]; }
     bool hasPath() const { return !_paths.isEmpty(); }
     const QList<Path> &paths() const { return _paths; }

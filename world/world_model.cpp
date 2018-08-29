@@ -1,10 +1,8 @@
 #include "world_model.h"
-#include "simulator.h"
+#include "path_planner.h"
 
 #include <QPainter>
 #include <QtMath>
-
-#include <QDebug>
 
 template<class T>
 static QList<QVariant> toVariantList(const QVector<T> &vec) {
@@ -18,16 +16,6 @@ static QList<QVariant> toVariantList(const QList<T> &list) {
     return toVariantList<T>(list.toVector());
 }
 
-Pose Pose::toDegrees() const {
-    return Pose(x, y, qRadiansToDegrees(th));
-}
-
-Pose::operator QVariant() const {
-    QVariant v;
-    v.setValue(*this);
-    return v;
-}
-
 //=============================================================================
 
 WorldObject::WorldObject(Type type, const QString &id)
@@ -37,7 +25,7 @@ WorldObject::WorldObject(Type type, const QString &id)
       _speedLin(0.5), _speedAng(90.0),
       _brush(type == Robot ? QColor(135, 206, 250) : Qt::blue)
 {
-    _waypoints.append({0, 0, 0});
+    _waypoints.append({0, 0});
 }
 
 double WorldObject::angularSpeedRad() const {
@@ -70,9 +58,13 @@ void WorldObject::removeWaypoint(int i) {
     }
 }
 
-QVector<QVector3D> WorldObject::path() const {
-    QVector<QVector3D> path;
-    for(auto &p : _paths) path.append(p.toVector3D());
+Path WorldObject::path() const {
+    Path path;
+    path.ok = true;
+    for(auto &p : _paths) {
+        path.append(p);
+        path.ok &= p.ok;
+    }
     return path;
 }
 
@@ -261,7 +253,7 @@ void WorldModel::addObject(WorldObject::Type type, const QPointF &pos, const QSt
         return;
     }
 
-    obj->setPose({pos.x(), pos.y(), 0});
+    obj->setPose({pos.x(), pos.y(), Angle()});
     _objects[objId] = obj;
 
     emit objectCreated(obj);
@@ -349,8 +341,8 @@ int WorldModel::createWaypoint(WorldObject *object, const Pose &pose, int i) {
 }
 
 void WorldModel::updatePath(WorldObject *wo, int p1, int p2) {
-    auto ps = wo->waypoint(p1).toVector3D();//waypointPose(wo->waypoint(p1));
-    auto pg = wo->waypoint(p2).toVector3D();//waypointPose(wo->waypoint(p2));
+    auto ps = wo->waypoint(p1);
+    auto pg = wo->waypoint(p2);
 
     _planner->setRobotSize(wo->worldSize());
     auto plan = _planner->makePlan(ps, pg);

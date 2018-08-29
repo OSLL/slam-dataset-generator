@@ -4,8 +4,9 @@
 #include <QObject>
 #include <QString>
 #include <QVector>
-#include <QVector3D>
 #include <QHash>
+
+#include "world_model.h"
 
 namespace Stg {
 class World;
@@ -14,15 +15,13 @@ class ModelPosition;
 class ModelRanger;
 }
 
-class WorldModel;
-
 struct StageObjectState {
     QString id;
-    QVector3D gtPose;       // groundtruth pose
-    QVector3D estOrig;      // pose estimation origin
-    QVector3D estPose;      // estimated pose
-    QVector3D laserPose;    // laser pose
-    QVector3D speed;
+    Pose gtPose;       // groundtruth pose
+    Pose estOrig;      // pose estimation origin
+    Pose estPose;      // estimated pose
+    Pose laserPose;    // laser pose
+    Speed speed;
     QVector<double> laserRanges;
 };
 
@@ -39,9 +38,8 @@ public:
     ~StageWrapper();
 
     bool load(const QString &fileName);
-    void moveTo(const QString &id, const QVector3D &goal);
-    void moveTo(const QString &id, double x, double y, double th);
-    void setSpeed(const QString &id, const QVector3D &speed, int timeMs);
+    void moveTo(const QString &id, const Pose &goal);
+    void setSpeed(const QString &id, const Speed &speed, int timeMs);
     void setSpeed(const QString &id, double x, double y, double a, int timeMs);
 
 public slots:
@@ -49,7 +47,7 @@ public slots:
 
 signals:
     void goalReached(const QString &id);
-    void objectStalled(const QString &id, const QVector3D &pose);
+    void objectStalled(const QString &id, const Pose &pose);
     void worldUpdated(const StageWorldState &state);
 
 private:
@@ -57,12 +55,12 @@ private:
         Goal(double x = 0, double y = 0, double th = 0, bool active = false)
             : x(x), y(y), th(th), time(0), active(active) {}
 
-        void setGoalPos(double x, double y, double t) {
+        void setGoalPose(const Pose &pose) {
             active = true;
             time = 0;
-            this->x = x;
-            this->y = y;
-            this->th = t;
+            this->x = pose.x;
+            this->y = pose.y;
+            this->th = pose.th.rad();
         }
 
         void setGoalTime(uint64_t time) {

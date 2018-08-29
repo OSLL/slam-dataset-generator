@@ -67,7 +67,7 @@ public slots:
     void enableTool(SimulationToolBox::Tool tool);
 
 signals:
-    void toolChanged(SimulationToolBox::Tool tool);
+    void toolChanged(int tool);
 
 private slots:
     void trigger(int id);

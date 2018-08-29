@@ -18,7 +18,7 @@ public:
         : QGraphicsObject(parent), _viewScale(1.0), _shapeType(WorldObject::Box), _baseItem(0) {}
 
     QBrush brush() const { return _brush; }
-    QVector3D pose() const { return QVector3D(x(), y(), rotation()); }
+    Pose pose() const { return Pose(x(), y(), Degrees(rotation())); }
 
     WorldObject::Shape shapeType() const { return _shapeType; }
     void setShapeType(WorldObject::Shape shape);
@@ -53,7 +53,7 @@ public:
 
 public slots:
     void setBrush(const QBrush &brush);
-    void setPose(const QVector3D &p);
+    void setPose(const Pose &p);
     void setOrigin(const QPointF &p);
     void setSize(const QSizeF &size);
 
@@ -61,7 +61,7 @@ signals:
     void poseEdited();
     void originEdited();
 
-    void poseChanged(const QVector3D &p);
+    void poseChanged(const Pose &p);
     void originChanged(const QPointF &p);
     void sizeChanged(const QSizeF &size);
     void brushChanged(const QBrush &b);
@@ -81,7 +81,7 @@ protected:
 
 private:
     WorldObjectItem *_baseItem;
-    QVector3D _prevPose;
+    Pose _prevPose;
 };
 
 //=============================================================================
@@ -102,7 +102,7 @@ public:
     void paint(QPainter *, const QStyleOptionGraphicsItem *, QWidget *) {}
 
 protected slots:
-    void setPose(const QVector3D &pose);
+    void setPose(const Pose &pose);
 
 protected:
     bool sceneEventFilter(QGraphicsItem *watched, QEvent *event);
@@ -113,7 +113,7 @@ protected:
 
 private:
     QPointF _prevOrigin;
-    QVector3D _prevPose;
+    Pose _prevPose;
 };
 
 //=============================================================================

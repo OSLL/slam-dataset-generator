@@ -4,7 +4,6 @@
 #include <QGraphicsView>
 #include <QGraphicsPixmapItem>
 #include <QVector>
-#include <QVector3D>
 #include <QTimer>
 #include <QSharedPointer>
 
@@ -17,6 +16,8 @@ class WorldView : public QGraphicsView {
     Q_OBJECT
 
 public:
+    enum InteractionMode { Navigation, AddRobot, AddObstacle, SetTrajectory, DrawTrajectory };
+
     WorldView(WorldModel *model, QWidget *parent = 0);
 
     void setSimulationMode(bool on, bool online = true);
@@ -25,8 +26,8 @@ public:
 
 public slots:
     void clear();
-    void setInteractionMode(SimulationToolBox::Tool mode);
-    void setObjectPosition(const QString &id, const QVector3D &pos);
+    void setInteractionMode(InteractionMode mode);
+    void setObjectPosition(const QString &id, const Pose &pos);
     void setRobotCrashed(bool on);
     void setLaserScan(const LaserScan &scan);
     void removeSelectedItems();
@@ -36,7 +37,7 @@ signals:
     void simulationAvailabilityChanged(bool on);
     void objectSelected(WorldObject *object);
     void message(NotificationsWidget::MessageType type, const QString &msg);
-    void changeTool(SimulationToolBox::Tool tool);
+    void changeTool(int tool);
 
 protected:
     void mouseDoubleClickEvent(QMouseEvent *event);
@@ -162,7 +163,7 @@ private:
     WorldObjectItem *worldObjectItemAt(const QPoint &p) const;
     ObjectView *senderItemView() const;
 
-    QVector3D objectPose(const WorldObject *wo, int wpi = -1) const;
+    Pose objectPose(const WorldObject *wo, int wpi = -1) const;
 
     QPair<int, int> findWaypoints(WorldObjectPathItem *pathItem) const;
 
@@ -192,7 +193,7 @@ private:
     ControlStack *_itemControls;
     ObjectViewHash _objectViews;
 
-    SimulationToolBox::Tool _mode;
+    InteractionMode _mode;
     double _viewScale;
     QPoint _lastMousePos;
     bool _mousePressed;

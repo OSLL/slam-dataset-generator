@@ -13,6 +13,11 @@
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     createMenus();
 
+    _toolMap[SimulationToolBox::Navigation]    = WorldView::Navigation;
+    _toolMap[SimulationToolBox::AddRobot]      = WorldView::AddRobot;
+    _toolMap[SimulationToolBox::AddObstacle]   = WorldView::AddObstacle;
+    _toolMap[SimulationToolBox::SetTrajectory] = WorldView::SetTrajectory;
+
     _model = new WorldModel(this);
 
     _simControl = new SimulationControl(this);
@@ -35,7 +40,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
             _notifications, SLOT(showMessage(NotificationsWidget::MessageType,QString)));
 
     _sim = new Simulator(_model, this);
-    connect(_sim, SIGNAL(positionChanged(QString,QVector3D)), _view, SLOT(setObjectPosition(QString,QVector3D)));
+    connect(_sim, SIGNAL(positionChanged(QString,Pose)), _view, SLOT(setObjectPosition(QString,Pose)));
     connect(_sim, SIGNAL(scanChanged(LaserScan)), _view, SLOT(setLaserScan(LaserScan)));
     connect(_sim, SIGNAL(robotCrashed(bool)), _view, SLOT(setRobotCrashed(bool)));
     connect(_sim, SIGNAL(simulationProgress(int)), _simControl, SLOT(setProgress(int)));
@@ -47,8 +52,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     connect(_objConfig, SIGNAL(removeRequested()), _view, SLOT(removeSelectedItems()));
 
     _simTools = new SimulationToolBox(this);
-    connect(_simTools, SIGNAL(toolChanged(SimulationToolBox::Tool)), _view, SLOT(setInteractionMode(SimulationToolBox::Tool)));
-    connect(_view, SIGNAL(changeTool(SimulationToolBox::Tool)), _simTools, SLOT(enableTool(SimulationToolBox::Tool)));
+    connect(_simTools, SIGNAL(toolChanged(int)), this, SLOT(setViewInteractionMode(int)));
+    connect(_view, SIGNAL(changeTool(int)), this, SLOT(setActiveTool(int)));
+//    connect(_view, SIGNAL(changeTool(SimulationToolBox::Tool)), _simTools, SLOT(enableTool(SimulationToolBox::Tool)));
     addToolBar(Qt::TopToolBarArea, _simTools);
 
     QHBoxLayout *sl = new QHBoxLayout();
@@ -224,6 +230,16 @@ void MainWindow::showObjectConfigDialog(WorldObject *object) {
         _objConfig->move(_view->parentWidget()->mapToGlobal(_view->pos()));
         _objConfig->show();
     } else _objConfig->hide();
+}
+
+void MainWindow::setViewInteractionMode(int tool) {
+    auto t = _toolMap.find(tool);
+    if(t != _toolMap.end()) _view->setInteractionMode(static_cast<WorldView::InteractionMode>(t.value()));
+}
+
+void MainWindow::setActiveTool(int mode) {
+    int tool = _toolMap.key(mode, -1);
+    if(tool != -1) _simTools->enableTool(static_cast<SimulationToolBox::Tool>(tool));
 }
 
 void MainWindow::createMenus() {

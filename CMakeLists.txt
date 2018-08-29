@@ -35,16 +35,17 @@ qt5_wrap_ui(UI_HEADERS ui/simulator_config.ui ui/object_config.ui)
 qt5_add_resources(UI_RESOURCES resources.qrc)
 
 #force Qt Creator to show all project files
-#file(GLOB_RECURSE Headers world_object.h)
-#add_custom_target(headers SOURCES ${Headers})
+file(GLOB_RECURSE Headers data_structures.h)
+add_custom_target(headers SOURCES ${Headers})
 
 link_directories(${STAGE_INSTALL}/lib)
 link_directories(/opt/ros/$ENV{ROS_DISTRO}/lib)
 include_directories(/opt/ros/$ENV{ROS_DISTRO}/include ${STAGE_INCLUDE_DIRS} ${OMPL_INCLUDE_DIRS})
-include_directories(world)
+include_directories(world simulation)
 add_executable(dataset_generator
-    main.cpp mainwindow.cpp widgets.cpp simulator.cpp stage_wrapper.cpp project_file.cpp
+    main.cpp mainwindow.cpp widgets.cpp project_file.cpp
     world/world_model.cpp world/world_items.cpp world/world_view.cpp
+    simulation/path_planner.cpp simulation/simulator.cpp simulation/stage_wrapper.cpp
     ${UI_HEADERS} ${UI_RESOURCES}
 )
 target_link_libraries(dataset_generator ${catkin_LIBRARIES} ${STAGE_LIBRARIES} ${OMPL_LIBRARIES})

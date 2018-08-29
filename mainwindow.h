@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QHash>
 
 #include "world_view.h"
 #include "widgets.h"
@@ -32,6 +33,9 @@ private slots:
     void updateSimulationSettings(SimulatorConfig::Options options);
     void showObjectConfigDialog(WorldObject *object);
 
+    void setViewInteractionMode(int tool);
+    void setActiveTool(int mode);
+
 private:
     void createMenus();
 
@@ -44,6 +48,8 @@ private:
     NotificationsWidget *_notifications;
     WorldObjectConfigWidget *_objConfig;
     QString _currentProject;
+
+    QHash<int, int> _toolMap;
 };
 
 

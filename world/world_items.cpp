@@ -32,9 +32,9 @@ void WorldObjectItem::setBrush(const QBrush &brush) {
     emit brushChanged(_brush);
 }
 
-void WorldObjectItem::setPose(const QVector3D &p) {
-    setPos(p.x(), p.y());
-    setRotation(p.z());
+void WorldObjectItem::setPose(const Pose &p) {
+    setPos(p.x, p.y);
+    setRotation(p.th.deg());
 }
 
 void WorldObjectItem::setOrigin(const QPointF &p) {
@@ -77,9 +77,9 @@ QPen WorldObjectItem::cosmeticPen(const QBrush &color) {
 
 //=============================================================================
 
-void WorldObjectControlItem::setPose(const QVector3D &pose) {
-    setPos(pose.toPointF());
-    setRotation(pose.z());
+void WorldObjectControlItem::setPose(const Pose &pose) {
+    setPos(pose.x, pose.y);
+    setRotation(pose.th.deg());
 }
 
 QBrush WorldObjectControlItem::brushForType(ControlType type) const {
@@ -113,7 +113,7 @@ bool WorldObjectControlItem::sceneEventFilter(QGraphicsItem *watched, QEvent *ev
 ObstacleControlItem::ObstacleControlItem(ControlType type, WorldObjectItem *item, QGraphicsItem *parent)
     : WorldObjectControlItem(type, item, parent), _selection(0), _rotAxis(0), _rotHandle(0), _origHandle(0)
 {
-    connect(item, SIGNAL(poseChanged(QVector3D)), this, SLOT(setPose(QVector3D)));
+    connect(item, SIGNAL(poseChanged(Pose)), this, SLOT(setPose(Pose)));
     connect(item, SIGNAL(sizeChanged(QSizeF)), this, SLOT(adjustHandles()));
     connect(item, SIGNAL(originChanged(QPointF)), this, SLOT(adjustOrigin()));
     connect(item, SIGNAL(viewScaleChanged(double)), this, SLOT(adjustOrigin()));
@@ -245,7 +245,7 @@ void ObstacleControlItem::adjustSize(int handle, const QPointF &delta) {
 RobotControlItem::RobotControlItem(ControlType type, WorldObjectItem *item, QGraphicsItem *parent)
     : WorldObjectControlItem(type, item, parent), _rotHandle(0)
 {
-    connect(item, SIGNAL(poseChanged(QVector3D)), this, SLOT(setPose(QVector3D)));
+    connect(item, SIGNAL(poseChanged(Pose)), this, SLOT(setPose(Pose)));
 
     auto baseBrush = brushForType(type);
     double r = _item->boundingRect().width();
@@ -285,7 +285,7 @@ bool RobotControlItem::sceneEventFilter(QGraphicsItem *watched, QEvent *event) {
 WaypointControlItem::WaypointControlItem(ControlType type, WorldObjectItem *item, QGraphicsItem *parent)
     : WorldObjectControlItem(type, item, parent)
 {
-    connect(item, SIGNAL(poseChanged(QVector3D)), this, SLOT(adjustPos()));
+    connect(item, SIGNAL(poseChanged(Pose)), this, SLOT(adjustPos()));
     connect(item, SIGNAL(viewScaleChanged(double)), this, SLOT(adjustPos()));
 
     setFlag(ItemIgnoresTransformations);
@@ -480,7 +480,8 @@ void LaserScanItem::setLaserScan(const LaserScan &scan) {
     double a = scan.minAngle;
     for(auto &r : scan.ranges) {
         if(r > scan.minRange && r < scan.maxRange) {
-            _scan.append({r * qCos(a + scan.pose.z()), -r * qSin(a + scan.pose.z())});
+            _scan.append({r * qCos(a + scan.pose.th.rad()),
+                         -r * qSin(a + scan.pose.th.rad())});
         }
         a += scan.angleIncrement;
     }

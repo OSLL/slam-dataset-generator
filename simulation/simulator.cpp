@@ -3,19 +3,14 @@
 #include <QRgb>
 #include <QtMath>
 #include <QLineF>
-#include <QPolygonF>
-#include <QTransform>
 #include <QFileInfo>
 #include <QFileDialog>
 #include <QSignalMapper>
 #include <QApplication>
-#include <QTemporaryFile>
 
 #include <sensor_msgs/LaserScan.h>
 #include <tf/tf.h>
 #include <tf/tfMessage.h>
-
-#include <algorithm>
 
 #include <QDebug>
 
@@ -38,101 +33,6 @@ static bool exportAsPgm(const QPixmap &pix, const QString &outputFileName) {
     out.write(rstData);
 
     return true;
-}
-
-//=============================================================================
-
-PathPlanner::PathPlanner(QObject *parent) : QObject(parent) {
-    ompl::msg::setLogLevel(ompl::msg::LOG_WARN);
-}
-
-PathPlanner::~PathPlanner() {
-}
-
-bool PathPlanner::isStateValid(const ompl::base::State *state) const {
-    if(_map.isNull()) return false;
-
-    double sx = state->as<ompl::base::SE2StateSpace::StateType>()->getX();
-    double sy = state->as<ompl::base::SE2StateSpace::StateType>()->getY();
-    double st = state->as<ompl::base::SE2StateSpace::StateType>()->getYaw();
-
-    if(!isValidPixel(sx, sy)) return false;
-
-    // TODO replace with mapToPolygon and proper constraints checking,
-    //      current constraints are too strict
-    auto t = QTransform::fromTranslate(sx, sy).rotateRadians(st);
-    auto robotRect = t.mapRect(_robot);
-    for(int y = robotRect.top(); y <= qCeil(robotRect.bottom()); ++y) {
-        for(int x = robotRect.left(); x <= qCeil(robotRect.right()); ++x) {
-            if(!isValidPixel(x, y)) return false;
-            if(qGray(_map.pixel(x, y)) < 127) return false;
-        }
-    }
-
-    return true;
-}
-
-bool PathPlanner::isValidPixel(int x, int y) const {
-    return 0 <= x && x < _map.width() && 0 <= y && y < _map.height();
-}
-
-QVector<QVector3D> PathPlanner::makePlan(const QVector3D &start, const QVector3D &goal) {
-    boost::shared_ptr<ompl::base::SE2StateSpace> space(new ompl::base::SE2StateSpace());
-    //        auto space(std::make_shared<ompl::base::SE2StateSpace>());
-
-    ompl::base::RealVectorBounds bounds(2);
-    bounds.setLow(0);
-    bounds.setHigh(0, _map.width());
-    bounds.setHigh(1, _map.height());
-    space->setBounds(bounds);
-
-    ompl::geometric::SimpleSetup ss(space);
-    ss.setStateValidityChecker([this](const ompl::base::State *state) { return isStateValid(state); });
-    ss.getSpaceInformation()->setStateValidityCheckingResolution(1.0 / space->getMaximumExtent());
-
-    ompl::base::ScopedState<> s(space);
-    s[0] = start.x();
-    s[1] = start.y();
-    s[2] = start.z();
-
-    ompl::base::ScopedState<> g(space);
-    g[0] = goal.x();
-    g[1] = goal.y();
-    g[2] = goal.z();
-
-    ss.setStartAndGoalStates(s, g);
-
-    /*
-        for (int i = 0 ; i < 10 ; ++i) {
-            if (ss.getPlanner()) ss.getPlanner()->clear();
-            ss.solve();
-        }
-*/
-
-    ss.solve(1.0);
-
-    QVector<QVector3D> path;
-    if (ss.haveSolutionPath()) {
-        ss.simplifySolution();
-        auto p = ss.getSolutionPath();
-        ss.getPathSimplifier()->simplifyMax(p);
-//        ss.getPathSimplifier()->smoothBSpline(p);
-        for(auto *state : p.getStates()) {
-            auto st = state->as<ompl::base::SE2StateSpace::StateType>();
-            path.append(QVector3D(st->getX(), st->getY(), st->getYaw()));
-        }
-    }
-
-    return path;
-}
-
-void PathPlanner::setMap(const QPixmap &map) {
-    _map = map.toImage();
-}
-
-void PathPlanner::setRobotSize(const QSizeF &size) {
-    _robot = QRectF(-size.width() / 2.0, -size.height() / 2.0,
-                     size.width(), size.height());
 }
 
 //=============================================================================
@@ -186,7 +86,7 @@ void BagWriter::writeLaserScan(double time, const LaserScan &scan) {
     tr.header.stamp = ts;
     tr.header.frame_id = "base_link";
     tr.child_frame_id = "base_laser_link";
-    tr.transform = createTransform(scan.pose.x(), scan.pose.y(), scan.pose.z());
+    tr.transform = createTransform(scan.pose.x, scan.pose.y, scan.pose.th.rad());
 
     tf::tfMessage tfMsg;
     tfMsg.transforms.push_back(tr);
@@ -194,7 +94,7 @@ void BagWriter::writeLaserScan(double time, const LaserScan &scan) {
     _bag.write("/tf", ts, tfMsg);
 }
 
-void BagWriter::writeRobotPose(double time, const QVector3D &pose) {
+void BagWriter::writeRobotPose(double time, const Pose &pose) {
     auto ts = _time + ros::Duration().fromSec(time);
 
     // frame_id -> child_frame_id
@@ -208,7 +108,7 @@ void BagWriter::writeRobotPose(double time, const QVector3D &pose) {
     tr2.header.stamp = ts;
     tr2.header.frame_id = "odom_combined";
     tr2.child_frame_id = "base_footprint";
-    tr2.transform = createTransform(pose.x(), pose.y(), pose.z());
+    tr2.transform = createTransform(pose.x, pose.y, pose.th.rad());
 
     tf::tfMessage msg;
     msg.transforms.push_back(tr1);
@@ -244,12 +144,12 @@ void GroundTruthWriter::close() {
     _file.close();
 }
 
-void GroundTruthWriter::writeRobotPose(double time, const QVector3D &pose) {
+void GroundTruthWriter::writeRobotPose(double time, const Pose &pose) {
     auto t = _time + ros::Duration().fromSec(time);
-    auto q = tf::createQuaternionFromYaw(pose.z());
+    auto q = tf::createQuaternionFromYaw(pose.th.rad());
 
     _ts << t.sec << "." << t.nsec << " "
-        << pose.x() << " " << pose.y() << " 0 "
+        << pose.x << " " << pose.y << " 0 "
         << q.x() << " " << q.y() << " " << q.z() << " " << q.w()
         << "\n";
 }
@@ -359,11 +259,11 @@ void SimulatorConfig::applySettings() {
 PathTracker::PathTracker(QObject *parent)
     : QObject(parent), _curIdx(0), _ignoreNextPoint(false), _alignPath(false), _ignoreCount(0) {}
 
-PathTracker::PathTracker(const QVector<QVector3D> &path, bool align, QObject *parent) : PathTracker(parent) {
+PathTracker::PathTracker(const Path &path, bool align, QObject *parent) : PathTracker(parent) {
     init(path, align);
 }
 
-void PathTracker::init(const QVector<QVector3D> &path, bool align) {
+void PathTracker::init(const Path &path, bool align) {
     _path = path;
     _alignPath = align;
     _curIdx = 0;
@@ -371,7 +271,7 @@ void PathTracker::init(const QVector<QVector3D> &path, bool align) {
     _waypointIdxs.clear();
     _waypointIdxs.append(0);
     for(int i = 0; i < path.size() - 1; ++i) {
-        if(qFuzzyCompare(path[i], path[i + 1])) _waypointIdxs.append(i);
+        if(path[i] == path[i + 1]) _waypointIdxs.append(i);
         else _totalLength += distance(path[i], path[i + 1]);
     }
     _waypointIdxs.append(path.size() - 1);
@@ -384,14 +284,14 @@ bool PathTracker::hasNextPoint() const {
     return _curIdx < _path.size() - (_ignoreNextPoint ? 0 : 1);
 }
 
-QVector3D PathTracker::nextPoint() {
+Pose PathTracker::nextPoint() {
     if(_ignoreNextPoint) {
         ++_ignoreCount;
         _ignoreNextPoint = false;
         return _currentPoint;
     }
 
-    QVector3D p;
+    Pose p;
 
     if(!hasNextPoint()) return p;
     if(_waypointIdxs.contains(_curIdx + 1) || !_alignPath) {
@@ -411,7 +311,7 @@ QVector3D PathTracker::nextPoint() {
     return p;
 }
 
-float PathTracker::updateProgress(const QVector3D &pos) {
+float PathTracker::updateProgress(const Pose &pos) {
     float p = 1;
     if(_curIdx < _path.size()) {
         p = (_completedLength + _curChunkLength - distance(pos, _path[_curIdx])) / _totalLength;
@@ -420,17 +320,17 @@ float PathTracker::updateProgress(const QVector3D &pos) {
     return p;
 }
 
-double PathTracker::distance(const QVector3D &p1, const QVector3D &p2) const {
+double PathTracker::distance(const Pose &p1, const Pose &p2) const {
     return QLineF(p1.toPointF(), p2.toPointF()).length();
 }
 
-QVector3D PathTracker::alignedTo(const QVector3D &p1, const QVector3D &p2) const {
-    return QVector3D(p1.x(), p1.y(), qAtan2(p2.y() - p1.y(), p2.x() - p1.x()));
+Pose PathTracker::alignedTo(const Pose &p1, const Pose &p2) const {
+    return Pose(p1.x, p1.y, Radians(qAtan2(p2.y - p1.y, p2.x - p1.x)));
 }
 
 //=============================================================================
 
-Simulator::ObjectState::ObjectState(WorldObject *object, const QVector3D &pose, const QVector<QVector3D> &path)
+Simulator::ObjectState::ObjectState(WorldObject *object, const Pose &pose, const Path &path)
     : object(object), path(path.isEmpty() ? 0 : new PathTracker(path, true)), pose(pose)
 {}
 
@@ -438,7 +338,7 @@ Simulator::ObjectState::~ObjectState() {
     delete path;
 }
 
-void Simulator::ObjectState::setPath(const QVector<QVector3D> &p, bool align) {
+void Simulator::ObjectState::setPath(const Path &p, bool align) {
     if(path) path->init(p, align);
     else path = new PathTracker(p, align);
 }
@@ -538,7 +438,7 @@ void Simulator::simulate(const SimulatorConfig *config) {
     delete _stg;
     _stg = new StageWrapper(_model, this);
     connect(_stg, SIGNAL(goalReached(QString)), this, SLOT(goalReached(QString)));
-    connect(_stg, SIGNAL(objectStalled(QString,QVector3D)), this, SLOT(objectStalled(QString,QVector3D)));
+    connect(_stg, SIGNAL(objectStalled(QString,Pose)), this, SLOT(objectStalled(QString,Pose)));
     connect(_stg, SIGNAL(worldUpdated(StageWorldState)), this, SLOT(worldUpdated(StageWorldState)));
     connect(_stgTimer, SIGNAL(timeout()), _stg, SLOT(update()));
 
@@ -571,16 +471,12 @@ QPointF Simulator::mapToStg(const QPointF &p) const {
     return QPointF(p.x() * _mapResolution, -p.y() * _mapResolution);
 }
 
-QVector3D Simulator::mapToStg(const QVector3D &p) const {
-    return QVector3D(p.x() * _mapResolution, -p.y() * _mapResolution, -p.z());
+Pose Simulator::mapToStg(const Pose &p) const {
+    return Pose(p.x * _mapResolution, -p.y * _mapResolution, -p.th);
 }
 
-QVector3D Simulator::mapFromStg(const QVector3D &p) const {
-    return QVector3D(p.x() / _mapResolution, -p.y() / _mapResolution, -p.z());
-}
-
-QVector3D Simulator::mapToStg(const Pose &p) const {
-    return mapToStg(p.toVector3D());
+Pose Simulator::mapFromStg(const Pose &p) const {
+    return Pose(p.x / _mapResolution, -p.y / _mapResolution, -p.th);
 }
 
 Simulator::ObjectState *Simulator::stateById(const QString &id) {
@@ -588,8 +484,8 @@ Simulator::ObjectState *Simulator::stateById(const QString &id) {
     return obj == _objects.end() ? 0 : &obj.value();
 }
 
-QVector3D Simulator::randomOffset(double maxX, double maxY, double maxTh) const {
-    return QVector3D(randomValue(maxX), randomValue(maxY), randomValue(maxTh));
+Pose Simulator::randomOffset(double maxX, double maxY, double maxTh) const {
+    return Pose(randomValue(maxX), randomValue(maxY), Radians(randomValue(maxTh)));
 }
 
 double Simulator::randomValue(double maxVal) const {
@@ -620,20 +516,17 @@ void Simulator::goalReached(const QString &id) {
             auto sp = st->speed + randomOffset(st->object->linearSpeed() / 2.0,
                                                st->object->linearSpeed() / 2.0,
                                                st->object->angularSpeedRad() / 2.0);
-            _stg->setSpeed(id, sp.x(), sp.y(), sp.z(), randomValue(1000) + 1500);
+            _stg->setSpeed(id, sp.x, sp.y, sp.th.rad(), randomValue(1000) + 1500);
             break;
         }
-        case WorldObject::RandomPos: {
-            auto p = st->pose + randomOffset(10, 10, 2 * M_PI);
-            _stg->moveTo(id, p.x(), p.y(), p.z());
+        case WorldObject::RandomPos:
+            _stg->moveTo(id, st->pose + randomOffset(10, 10, 2 * M_PI));
             break;
-        }
-        case WorldObject::Trajectory: {
+        case WorldObject::Trajectory:
             if(st->path->hasNextPoint()) {
                 _stg->moveTo(id, mapToStg(st->path->nextPoint()));
             }
             break;
-        }
         default:
             return;
         }
@@ -643,7 +536,7 @@ void Simulator::goalReached(const QString &id) {
     }
 }
 
-void Simulator::objectStalled(const QString &id, const QVector3D &pose) {
+void Simulator::objectStalled(const QString &id, const Pose &pose) {
     auto st = stateById(id);
     switch(st->object->type()) {
     case WorldObject::Robot:
@@ -654,11 +547,11 @@ void Simulator::objectStalled(const QString &id, const QVector3D &pose) {
             emit robotCrashed(true);
         } else {
             st->path->ignoreNextPoint();
-            _stg->setSpeed(id, -st->speed.x() / 2.0, 0.0, 0.0, randomValue(250) + 750);
+            _stg->setSpeed(id, -st->speed.x / 2.0, 0.0, 0.0, randomValue(250) + 750);
         }
         break;
     case WorldObject::Obstacle:
-        _stg->setSpeed(id, -st->speed.x() / 2.0, -st->speed.y() / 2.0, -st->speed.z() / 2.0,
+        _stg->setSpeed(id, -st->speed.x / 2.0, -st->speed.y / 2.0, -st->speed.th.rad() / 2.0,
                        randomValue(300) + 800);
 //        goalReached(id);
         break;
@@ -703,7 +596,7 @@ void Simulator::worldUpdated(const StageWorldState &s) {
 
         // transform to viewport coordinates
         _laserScan.pose = mapFromStg(r.gtPose + r.laserPose);
-        _laserScan.pose.setZ(-_laserScan.pose.z());
+        _laserScan.pose.th = -_laserScan.pose.th;
         for(auto &lr : _laserScan.ranges) lr /= _mapResolution;
         emit scanChanged(_laserScan);
     }
@@ -756,15 +649,15 @@ QString Simulator::generateObstacle(const WorldObject *object) const {
     // in Stage origin is an object center; object pose is relative to the origin
     auto center = QPointF(object->worldSize().width() / 2.0, object->worldSize().height() / 2.0);
     auto origin = mapToStg(center / _mapResolution - object->origin());
-    auto pose = mapToStg(object->pose().toDegrees());
+    auto pose = mapToStg(object->pose());
 
     SET_PROPERTY("<size_x>", object->worldSize().width());
     SET_PROPERTY("<size_y>", object->worldSize().height());
     SET_PROPERTY("<orig_x>", origin.x());
     SET_PROPERTY("<orig_y>", origin.y());
-    SET_PROPERTY("<pose_x>", pose.x());
-    SET_PROPERTY("<pose_y>", pose.y());
-    SET_PROPERTY("<pose_t>", pose.z());
+    SET_PROPERTY("<pose_x>", pose.x);
+    SET_PROPERTY("<pose_y>", pose.y);
+    SET_PROPERTY("<pose_t>", pose.th.deg());
     if(object->motionType() == WorldObject::Static) {
         SET_PROPERTY("<sp_lin>", 0.0);
         SET_PROPERTY("<sp_ang>", 0.0);
@@ -793,15 +686,15 @@ QString Simulator::generateObstacle(const WorldObject *object) const {
 QString Simulator::generateRobot(const RobotObject *object, const SimulatorConfig *config) const {
     QString tmp = readTemplate(":/templates/robot.template");
 
-    auto pose = mapToStg(object->pose().toDegrees());
+    auto pose = mapToStg(object->pose());
 
     tmp.replace("<robot_name>",     object->id());
     tmp.replace("<robot_drive>",    driveTypeToString(object->driveType()));
     SET_PROPERTY("<robot_size_x>",  object->worldSize().width());
     SET_PROPERTY("<robot_size_y>",  object->worldSize().height());
-    SET_PROPERTY("<robot_x>",       pose.x());
-    SET_PROPERTY("<robot_y>",       pose.y());
-    SET_PROPERTY("<robot_th>",      pose.z());
+    SET_PROPERTY("<robot_x>",       pose.x);
+    SET_PROPERTY("<robot_y>",       pose.y);
+    SET_PROPERTY("<robot_th>",      pose.th.deg());
     SET_PROPERTY("<robot_slx>",     object->linearSpeed());
     SET_PROPERTY("<robot_sa>",      object->angularSpeed());
     SET_PROPERTY("<laser_rmin>",    config->laserRangeMin());
