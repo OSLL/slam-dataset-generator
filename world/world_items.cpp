@@ -381,6 +381,7 @@ ObstacleItem::ObstacleItem(QGraphicsItem *parent)
 }
 
 void ObstacleItem::setOrigin(double x, double y) {
+    if(_origin == QPointF(x, y)) return;
     _origin = {x, y};
     emit originChanged(_origin);
 }

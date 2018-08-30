@@ -84,6 +84,7 @@ inline QDataStream &operator >>(QDataStream &stream, Angle &angle) {
 
 struct Pose {
     Pose() : x(0), y(0), th() {}
+    Pose(const QPointF &p, const Angle &th) : x(p.x()), y(p.y()), th(th) {}
     Pose(double x, double y, const Angle &th = Angle()) : x(x), y(y), th(th) {}
 
     double x, y;

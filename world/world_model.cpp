@@ -189,6 +189,7 @@ void WorldModel::setData(WorldObject *object, DataRole role, const QVariant &val
     switch(role) {
     case SizeRole:   SET_DATA(_size, value.toSizeF());
     case OriginRole: SET_DATA(_origin, value.toPointF());
+    case PoseRole:   SET_DATA(_waypoints[0], value.value<Pose>());
     case MotionRole: SET_DATA(_motion, static_cast<WorldObject::Motion>(value.toInt()));
     case DriveRole:  SET_DATA(_drive, static_cast<WorldObject::Drive>(value.toInt()));
     case ShapeRole:  SET_DATA(_shape, static_cast<WorldObject::Shape>(value.toInt()));
@@ -344,7 +345,7 @@ void WorldModel::updatePath(WorldObject *wo, int p1, int p2) {
     auto ps = wo->waypoint(p1);
     auto pg = wo->waypoint(p2);
 
-    _planner->setRobotSize(wo->worldSize());
+    _planner->setRobotSize(wo->worldSize() / _worldScale);
     auto plan = _planner->makePlan(ps, pg);
     bool ok = !plan.isEmpty();
     wo->setPath(p1, Path(plan, ok));
@@ -407,8 +408,9 @@ bool WorldModel::loadObject(ProjectFile &project) {
     auto &settings = *project.settings();
 
     auto id = settings.value("Id").toString();
+    auto pose = settings.value("Pose").value<Pose>();
     addObject(static_cast<WorldObject::Type>(settings.value("Type", -1).toInt()),
-              settings.value("Pose").value<Pose>().toPointF(), id);
+              QPointF(0, 0), id);
 
     auto *object = _objects[id];
     if(!object) return false;
@@ -419,6 +421,7 @@ bool WorldModel::loadObject(ProjectFile &project) {
     setData(object, SpeedAngRole, settings.value("SpeedAngular"));
     setData(object, SizeRole,     settings.value("Size"));
     setData(object, OriginRole,   settings.value("Origin"));
+    setData(object, PoseRole,     pose);
     setData(object, BrushRole,    settings.value("Brush"));
     setData(object, ShapeRole,    settings.value("Shape"));
 

@@ -27,7 +27,7 @@ public:
 public slots:
     void clear();
     void setInteractionMode(InteractionMode mode);
-    void setObjectPosition(const QString &id, const Pose &pos);
+    void setObjectPosition(const QString &id, const Pose &pose);
     void setRobotCrashed(bool on);
     void setLaserScan(const LaserScan &scan);
     void removeSelectedItems();
@@ -150,6 +150,7 @@ private:
     void changeTrajectoryBase(WorldObject *newBase);
 
     void addObject(WorldObject::Type type, const QPointF &pos);
+    void setObjectPose(WorldObjectItem *woi, const Pose &pose);
     void removeObject(WorldObjectItem *woi);
 
     void addWaypoint(WorldObject *object, int i, const QPointF &scenePos);

@@ -14,13 +14,7 @@ static QPen cosmeticPen(const QBrush &brush) {
     p.setCosmetic(true);
     return p;
 }
-/*
-static double normalizedRotation(double angle) {
-    angle = std::fmod(angle + 180.0, 360.0);
-    angle += angle < 0 ? 360.0 : -180.0;
-    return qDegreesToRadians(angle);
-}
-*/
+
 //=============================================================================
 
 WorldView::WorldView(WorldModel *model, QWidget *parent)
@@ -53,10 +47,8 @@ void WorldView::setSimulationMode(bool on, bool online) {
     if(!_map) return;
     auto robots = robotList();
 
-    if(on) {
-        scene()->clearSelection();
-        for(auto *r : robots) r->setCrashed(false);
-    }
+    scene()->clearSelection();
+    for(auto *r : robots) r->setCrashed(false);
 
     for(auto &ov : _objectViews) {
         if(!on) ov->item->setPose(ov->waypoints[0]->pose());
@@ -155,23 +147,9 @@ void WorldView::setInteractionMode(InteractionMode mode) {
     emit message(NotificationsWidget::Info, defaultMessage());
 }
 
-void WorldView::setObjectPosition(const QString &id, const Pose &pos) {
+void WorldView::setObjectPosition(const QString &id, const Pose &pose) {
     auto *ov = _objectViews[_model->object(id)];
-    if(!ov) return;
-
-    auto item = ov->item;
-    if(item->type() == RobotItem::Type) {
-        // robot's origin is always in (0, 0) so the pos can be set directly
-        item->setPos(pos.toPointF());
-    } else {
-        // a hack to avoid rounding errors when mapping pos to item's coordinates
-        auto so = item->sceneOrigin();
-        item->setRotation(0);
-        auto d = so - item->sceneOrigin();
-        item->setPos(pos.toPointF() - item->origin() - d);
-    }
-
-    item->setRotation(pos.th.deg());
+    if(ov) setObjectPose(ov->item, pose);
 }
 
 void WorldView::setRobotCrashed(bool on) {
@@ -451,6 +429,14 @@ void WorldView::updateObject(WorldObject *object, int role, const QVariant &data
         for(auto *p : ov->paths) p->setVisible(visible);
         break;
     }
+    case WorldModel::OriginRole: {
+        ov->item->setOrigin(data.toPointF());
+        break;
+    }
+    case WorldModel::PoseRole: {
+        setObjectPose(ov->item, data.value<Pose>());
+        break;
+    }
     default:
         return;
     }
@@ -569,6 +555,18 @@ void WorldView::addObject(WorldObject::Type type, const QPointF &pos) {
         return;
     }
     _model->addObject(type, mapToModel(_map->mapFromScene(pos)));
+}
+
+void WorldView::setObjectPose(WorldObjectItem *woi, const Pose &pose) {
+    switch(woi->type()) {
+    case RobotItem::Type:
+        // robot's origin is always in (0, 0) so the pos can be set directly
+        woi->setPose(pose);
+        break;
+    default:
+        auto origin = QTransform().rotateRadians(pose.th.rad()).map(woi->origin());
+        woi->setPose({pose.toPointF() - origin, pose.th});
+    }
 }
 
 void WorldView::removeObject(WorldObjectItem *woi) {
@@ -843,8 +841,8 @@ WorldView::ObjectView *WorldView::senderItemView() const {
 
 Pose WorldView::objectPose(const WorldObject *wo, int wpi) const {
     auto pose = wpi < 0 ? wo->pose() : wo->waypoint(wpi);
-    auto pos = mapFromModel(pose.toPointF() - wo->origin());
-    return Pose(pos.x(), pos.y(), pose.th);
+    auto orig = QTransform().rotateRadians(pose.th.rad()).map(wo->origin());
+    return Pose(mapFromModel(pose.toPointF() - orig), pose.th);
 }
 
 QPair<int, int> WorldView::findWaypoints(WorldObjectPathItem *pathItem) const {
