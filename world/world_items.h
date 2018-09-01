@@ -32,7 +32,7 @@ public:
         emit viewScaleChanged(scale);
     }
 
-    QSizeF size() const { return boundingRect().size(); }
+    virtual QSizeF size() const { return boundingRect().size(); }
     virtual void setSize(double w, double h) {}
 
     virtual QPointF origin() const { return transformOriginPoint(); }
@@ -188,6 +188,7 @@ public:
 
     RobotItem(QGraphicsItem *parent = 0);
 
+    QSizeF size() const { return _size; }
     void setSize(double w, double h);
     void setCrashed(bool on);
 
@@ -196,6 +197,7 @@ public:
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *);
 
 private:
+    QSizeF _size;
     bool _crashed;
 };
 

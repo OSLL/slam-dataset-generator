@@ -345,7 +345,12 @@ void WorldModel::updatePath(WorldObject *wo, int p1, int p2) {
     auto ps = wo->waypoint(p1);
     auto pg = wo->waypoint(p2);
 
-    _planner->setRobotSize(wo->worldSize() / _worldScale);
+    // TODO: a robot is drawn around (0, 0), but obstacles are drawn
+    // relative to top-left corner - should be unified
+    auto size = wo->worldSize() / _worldScale;
+    auto origin = wo->type() == WorldObject::Robot ? QPointF(size.width() / 2, size.height() / 2)
+                                                   : wo->origin();
+    _planner->setObjectShape(size, origin);
     auto plan = _planner->makePlan(ps, pg);
     bool ok = !plan.isEmpty();
     wo->setPath(p1, Path(plan, ok));

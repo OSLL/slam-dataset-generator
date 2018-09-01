@@ -339,7 +339,9 @@ RobotItem::RobotItem(QGraphicsItem *parent) : WorldObjectItem(parent), _crashed(
 }
 
 void RobotItem::setSize(double w, double h) {
-    emit sizeChanged({w, h});
+    if(_size == QSizeF(w, h)) return;
+    _size = QSizeF(w, h);
+    emit sizeChanged(_size);
 }
 
 void RobotItem::setCrashed(bool on) {
@@ -387,6 +389,8 @@ void ObstacleItem::setOrigin(double x, double y) {
 }
 
 void ObstacleItem::setSize(double w, double h) {
+    if(size() == QSizeF(w, h)) return;
+
     prepareGeometryChange();
 
     double ox = _origin.x() / _width  * w;

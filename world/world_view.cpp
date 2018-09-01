@@ -408,15 +408,12 @@ void WorldView::updateObject(WorldObject *object, int role, const QVariant &data
     if(!ov) return;
 
     switch(role) {
-    case WorldModel::BrushRole: {
+    case WorldModel::BrushRole:
         ov->item->setBrush(data.value<QBrush>());
         break;
-    }
-    case WorldModel::SizeRole: {
-        auto size = mapFromModel(data.toSizeF());
-        if(ov->item->size() != size) ov->item->setSize(size);
+    case WorldModel::SizeRole:
+        ov->item->setSize(mapFromModel(data.toSizeF()));
         break;
-    }
     case WorldModel::ShapeRole:
         ov->item->setShapeType(static_cast<WorldObject::Shape>(data.toInt()));
         break;
@@ -429,14 +426,12 @@ void WorldView::updateObject(WorldObject *object, int role, const QVariant &data
         for(auto *p : ov->paths) p->setVisible(visible);
         break;
     }
-    case WorldModel::OriginRole: {
+    case WorldModel::OriginRole:
         ov->item->setOrigin(data.toPointF());
         break;
-    }
-    case WorldModel::PoseRole: {
+    case WorldModel::PoseRole:
         setObjectPose(ov->item, data.value<Pose>());
         break;
-    }
     default:
         return;
     }
@@ -507,9 +502,11 @@ void WorldView::removeWaypoint(WorldObject *object, int i) {
     ov->waypoints.removeAt(i);
 
     if(i > 0 && i == ov->paths.size()) {
+        if(ov->paths[i - 1] == _selectedPath) _selectedPath = 0;
         delete ov->paths[i - 1];
         ov->paths.removeAt(i - 1);
     } else if(i < ov->paths.size()) {
+        if(ov->paths[i] == _selectedPath) _selectedPath = 0;
         delete ov->paths[i];
         ov->paths.removeAt(i);
         if(i > 0) setTempPath(ov, i - 1, i);

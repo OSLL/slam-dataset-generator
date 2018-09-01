@@ -125,7 +125,7 @@ public:
     bool setMap(const QString &fileName);
     const QPixmap &map() const { return _map; }
 
-    QSizeF mapWorldSize() const { return _map.size() * _worldScale; }
+    QSizeF mapWorldSize() const { return QSizeF(_map.size()) * _worldScale; }
     QSize mapSizePix() const { return _map.size(); }
 
     double worldScale() const { return _worldScale; }
