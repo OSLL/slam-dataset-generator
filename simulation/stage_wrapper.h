@@ -39,8 +39,10 @@ public:
 
     bool load(const QString &fileName);
     void moveTo(const QString &id, const Pose &goal);
+    void setPose(const QString &id, const Pose &pose);
     void setSpeed(const QString &id, const Speed &speed, int timeMs);
     void setSpeed(const QString &id, double x, double y, double a, int timeMs);
+    void setVisible(const QString &id, bool on);
 
 public slots:
     void update();

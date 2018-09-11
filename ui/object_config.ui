@@ -6,12 +6,12 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>180</width>
-    <height>460</height>
+    <width>205</width>
+    <height>608</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Config</string>
+   <string>Object</string>
   </property>
   <layout class="QGridLayout" name="gridLayout_3" columnstretch="0,0">
    <property name="sizeConstraint">
@@ -32,7 +32,7 @@
    <property name="spacing">
     <number>5</number>
    </property>
-   <item row="8" column="0" colspan="2">
+   <item row="9" column="0" colspan="2">
     <widget class="QPushButton" name="_pbRemove">
      <property name="text">
       <string>Remove</string>
@@ -40,13 +40,6 @@
      <property name="icon">
       <iconset resource="../resources.qrc">
        <normaloff>:/icons/remove.png</normaloff>:/icons/remove.png</iconset>
-     </property>
-    </widget>
-   </item>
-   <item row="0" column="0">
-    <widget class="QLabel" name="label_18">
-     <property name="text">
-      <string>Type:</string>
      </property>
     </widget>
    </item>
@@ -66,7 +59,14 @@
      </property>
     </widget>
    </item>
-   <item row="6" column="0" colspan="2">
+   <item row="0" column="0">
+    <widget class="QLabel" name="label_18">
+     <property name="text">
+      <string>Type:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="7" column="0" colspan="2">
     <widget class="QGroupBox" name="_gbSpeed">
      <property name="title">
       <string>Speed</string>
@@ -226,8 +226,8 @@
        </property>
        <property name="maximumSize">
         <size>
-         <width>32</width>
-         <height>16777215</height>
+         <width>22</width>
+         <height>22</height>
         </size>
        </property>
        <property name="text">
@@ -279,6 +279,37 @@
       <property name="spacing">
        <number>5</number>
       </property>
+      <item row="0" column="0">
+       <widget class="QLabel" name="label">
+        <property name="text">
+         <string>Type:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QComboBox" name="_motionType">
+        <item>
+         <property name="text">
+          <string>static</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>random speed</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>random pose</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>trajectory</string>
+         </property>
+        </item>
+       </widget>
+      </item>
       <item row="1" column="0">
        <widget class="QLabel" name="label_3">
         <property name="text">
@@ -300,41 +331,10 @@
         </item>
        </widget>
       </item>
-      <item row="0" column="0">
-       <widget class="QLabel" name="label">
-        <property name="text">
-         <string>Type:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <widget class="QComboBox" name="_motionType">
-        <item>
-         <property name="text">
-          <string>static</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>rnd. speed</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>rnd. pose</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>trajectory</string>
-         </property>
-        </item>
-       </widget>
-      </item>
      </layout>
     </widget>
    </item>
-   <item row="7" column="0" colspan="2">
+   <item row="8" column="0" colspan="2">
     <widget class="QGroupBox" name="_gbOdomNoise">
      <property name="title">
       <string>Odometry noise</string>
@@ -413,6 +413,127 @@
      </layout>
     </widget>
    </item>
+   <item row="6" column="0" colspan="2">
+    <widget class="QGroupBox" name="_gbTrajectory">
+     <property name="title">
+      <string>Trajectory</string>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_5" columnstretch="0,1,0">
+      <property name="leftMargin">
+       <number>3</number>
+      </property>
+      <property name="topMargin">
+       <number>2</number>
+      </property>
+      <property name="rightMargin">
+       <number>2</number>
+      </property>
+      <property name="bottomMargin">
+       <number>1</number>
+      </property>
+      <property name="spacing">
+       <number>5</number>
+      </property>
+      <item row="1" column="1" colspan="2">
+       <widget class="QComboBox" name="_trajEndAction">
+        <item>
+         <property name="text">
+          <string>stop</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>run from start</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>run backward</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="label_5">
+        <property name="text">
+         <string>Loops:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QSpinBox" name="_trajLoopsCount">
+        <property name="specialValueText">
+         <string>inf</string>
+        </property>
+        <property name="minimum">
+         <number>0</number>
+        </property>
+        <property name="maximum">
+         <number>999</number>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="2">
+       <widget class="QCheckBox" name="_trajLoopsInf">
+        <property name="text">
+         <string>inf.</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="0" colspan="3">
+       <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="1,0">
+        <property name="spacing">
+         <number>5</number>
+        </property>
+        <item>
+         <widget class="QCheckBox" name="_trajClosed">
+          <property name="enabled">
+           <bool>false</bool>
+          </property>
+          <property name="text">
+           <string>Closed trajectory</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="_pbRemoveTraj">
+          <property name="maximumSize">
+           <size>
+            <width>22</width>
+            <height>22</height>
+           </size>
+          </property>
+          <property name="toolTip">
+           <string>Remove trajectory</string>
+          </property>
+          <property name="text">
+           <string/>
+          </property>
+          <property name="icon">
+           <iconset resource="../resources.qrc">
+            <normaloff>:/icons/remove-trajectory.png</normaloff>:/icons/remove-trajectory.png</iconset>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_4">
+        <property name="text">
+         <string>At end:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="0" colspan="3">
+       <widget class="QCheckBox" name="_trajHideAtEnd">
+        <property name="text">
+         <string>Hide on finish</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
   </layout>
   <zorder>label_18</zorder>
   <zorder>_objectType</zorder>
@@ -427,6 +548,7 @@
   <zorder>_color</zorder>
   <zorder>groupBox</zorder>
   <zorder>_gbOdomNoise</zorder>
+  <zorder>_gbTrajectory</zorder>
  </widget>
  <customwidgets>
   <customwidget>

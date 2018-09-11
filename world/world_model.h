@@ -21,10 +21,11 @@ class PathPlanner;
 class WorldObject {
     friend class WorldModel;
 public:
-    enum Type   { Obstacle, Robot };
-    enum Shape  { Box, Ellipse, CustomShape };
-    enum Motion { Static, RandomSpeed, RandomPos, Trajectory };
-    enum Drive  { Diff, Omni };
+    enum Type      { Obstacle, Robot };
+    enum Shape     { Box, Ellipse, CustomShape };
+    enum Motion    { Static, RandomSpeed, RandomPos, Trajectory };
+    enum Drive     { Diff, Omni };
+    enum EndAction { StopAtEnd, RunFromStart, RunBackward };
 
     WorldObject(Type type, const QString &id);
     virtual ~WorldObject() {}
@@ -46,6 +47,10 @@ public:
     double angularSpeed() const { return _speedAng; }
     double angularSpeedRad() const;
 
+    EndAction endAction() const { return _endAction; }
+    int trajectoryLoops() const { return _trajLoops; }
+    bool hideAtEnd() const { return _hideAtEnd; }
+
     const QBrush &brush() const { return _brush; }
 
     Path path() const;
@@ -66,16 +71,20 @@ private:
     void setPath(int i, const Path &path);
 
 protected:
-    QString _id;
-    Type    _type;
-    Shape   _shape;
-    Motion  _motion;
-    Drive   _drive;
-    QSizeF  _size;
-    QPointF _origin;
-    double  _speedLin, _speedAng;
-    QBrush  _brush;
-    QPixmap _shapePix;
+    QString   _id;
+    Type      _type;
+    Shape     _shape;
+    Motion    _motion;
+    Drive     _drive;
+    QSizeF    _size;
+    QPointF   _origin;
+    double    _speedLin, _speedAng;
+    QBrush    _brush;
+    QPixmap   _shapePix;
+    EndAction _endAction;
+    int       _trajLoops; // ignored if _endAction = StopAtEnd
+                          // else 0 = infinity
+    bool      _hideAtEnd;
 
     QList<Pose> _waypoints;
     QList<Path> _paths;
@@ -106,6 +115,8 @@ public:
     enum DataRole { PoseRole, OriginRole, SizeRole, BrushRole,
                     MotionRole, DriveRole, ShapeRole, ShapePixmapRole,
                     SpeedAngRole, SpeedLinRole,
+                    WaypointAddedRole, WaypointRemovedRole,
+                    TrjEndActionRole, TrjLoopCountRole, TrjHideAtEndRole,
                     OdomNoiseRole, OdomNoiseLinRole, OdomNoiseAngRole };
 
     WorldModel(QObject *parent = 0);
@@ -135,7 +146,6 @@ public:
     quint64 obstacleCount() const;
 
     void addObject(WorldObject::Type type, const QPointF &pos, const QString &id = QString());
-    void removeObject(WorldObject *object);
 
     void addWaypoint(WorldObject *object, const Pose &pose);
     void insertWaypoint(WorldObject *object, int i, const Pose &pose);
@@ -144,13 +154,16 @@ public:
     void updateWaypoint(WorldObject *object, int wpi);
 
     void updateTrajectory(WorldObject *object);
-    void removeTrajectory(WorldObject *object);
     void updateAllTrajectories();
 
     WorldObject *object(const QString &id);
     const WorldObject *object(const QString &id) const;
 
     QPixmap pixmap(const WorldObject *object) const;
+
+public slots:
+    void removeObject(WorldObject *object);
+    void removeTrajectory(WorldObject *object);
 
 signals:
     void cleared();

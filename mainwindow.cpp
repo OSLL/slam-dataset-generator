@@ -42,19 +42,21 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     _sim = new Simulator(_model, this);
     connect(_sim, SIGNAL(positionChanged(QString,Pose)), _view, SLOT(setObjectPosition(QString,Pose)));
     connect(_sim, SIGNAL(scanChanged(LaserScan)), _view, SLOT(setLaserScan(LaserScan)));
+    connect(_sim, SIGNAL(visibleChanged(QString,bool)), _view, SLOT(setObjectVisible(QString,bool)));
     connect(_sim, SIGNAL(robotCrashed(bool)), _view, SLOT(setRobotCrashed(bool)));
     connect(_sim, SIGNAL(simulationProgress(int)), _simControl, SLOT(setProgress(int)));
     connect(_sim, SIGNAL(simulationFinished()), this, SLOT(finishSimulation()));
 
     _objConfig = new WorldObjectConfigWidget(_model, this);
     _objConfig->hide();
+    _objConfig->installEventFilter(this);
     connect(_view, SIGNAL(objectSelected(WorldObject*)), _objConfig, SLOT(setObject(WorldObject*)));
-    connect(_objConfig, SIGNAL(removeRequested()), _view, SLOT(removeSelectedItems()));
+    connect(_objConfig, SIGNAL(removeTrajectoryRequested(WorldObject*)), _model, SLOT(removeTrajectory(WorldObject*)));
+    connect(_objConfig, SIGNAL(removeObjectRequested(WorldObject*)), _model, SLOT(removeObject(WorldObject*)));
 
     _simTools = new SimulationToolBox(this);
     connect(_simTools, SIGNAL(toolChanged(int)), this, SLOT(setViewInteractionMode(int)));
     connect(_view, SIGNAL(changeTool(int)), this, SLOT(setActiveTool(int)));
-//    connect(_view, SIGNAL(changeTool(SimulationToolBox::Tool)), _simTools, SLOT(enableTool(SimulationToolBox::Tool)));
     addToolBar(Qt::TopToolBarArea, _simTools);
 
     QHBoxLayout *sl = new QHBoxLayout();
@@ -69,6 +71,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     l->setSpacing(5);
     l->setContentsMargins(5, 5, 5, 5);
     l->addLayout(sl, 0, 0, 1, 2);
+//    l->addWidget(_objConfig, 1, 0);
     l->addWidget(_view, 1, 0);
     l->addWidget(_simConfig, 1, 1);
     l->setColumnStretch(0, 1);
@@ -139,6 +142,13 @@ void MainWindow::moveEvent(QMoveEvent *event) {
     auto d = event->pos() - event->oldPos();
     _objConfig->move(_objConfig->pos() + d);
     QMainWindow::moveEvent(event);
+}
+
+bool MainWindow::eventFilter(QObject *watched, QEvent *event) {
+    if(watched == _objConfig && event->type() == QEvent::Move) {
+        _objConfigPosDelta = _objConfig->pos() - _view->parentWidget()->mapToGlobal(_view->pos());
+    }
+    return QMainWindow::eventFilter(watched, event);
 }
 
 void MainWindow::openProject() {
@@ -227,7 +237,7 @@ void MainWindow::updateSimulationSettings(SimulatorConfig::Options options) {
 
 void MainWindow::showObjectConfigDialog(WorldObject *object) {
     if(object) {
-        _objConfig->move(_view->parentWidget()->mapToGlobal(_view->pos()));
+        _objConfig->move(_view->parentWidget()->mapToGlobal(_view->pos()) + _objConfigPosDelta);
         _objConfig->show();
     } else _objConfig->hide();
 }
@@ -249,7 +259,8 @@ void MainWindow::createMenus() {
     fileMenu->addSeparator();
     fileMenu->addAction("Save project", this, SLOT(saveProject()))
             ->setShortcut(QKeySequence::Save);
-    fileMenu->addAction("Save project as ...", this, SLOT(saveProjectAs()));
+    fileMenu->addAction("Save project as ...", this, SLOT(saveProjectAs()))
+            ->setShortcut(QKeySequence::SaveAs);
     fileMenu->addSeparator();
     fileMenu->addAction("Exit", this, SLOT(close()))
             ->setShortcut(QKeySequence::Quit);

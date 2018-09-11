@@ -145,9 +145,12 @@ public:
     PathTracker(const Path &path, bool align, QObject *parent = 0);
 
     void init(const Path &path, bool align);
+    void reset();
+    void revert();
 
     bool hasNextPoint() const;
     Pose nextPoint();
+    Pose currentPoint() const { return _currentPoint; }
 
     void ignoreNextPoint() { _ignoreNextPoint = true; }
     int ignoreCount() const { return _ignoreCount; }
@@ -160,6 +163,7 @@ signals:
 private:
     double distance(const Pose &p1, const Pose &p2) const;
     Pose alignedTo(const Pose &p1, const Pose &p2) const;
+    void findWaypoints();
 
     Path _path;
     QVector<int> _waypointIdxs;
@@ -189,6 +193,7 @@ public:
 signals:
     void positionChanged(const QString &id, const Pose &newPos);
     void scanChanged(const LaserScan &scan);
+    void visibleChanged(const QString &id, bool on);
     void robotCrashed(bool on);
     void simulationProgress(int value);
     void simulationFinished();
@@ -211,6 +216,7 @@ private:
         PathTracker *path;
         Pose pose;
         Speed speed;
+        int loops;
     };
 
     QString readTemplate(const QString &fileName) const;
@@ -225,6 +231,7 @@ private:
     Pose mapFromStg(const Pose &p) const;
 
     ObjectState *stateById(const QString &id);
+    void onPathComplete(ObjectState *state);
     Pose randomOffset(double maxX, double maxY, double maxTh = 0) const;
     double randomValue(double maxVal) const;
 

@@ -266,18 +266,28 @@ PathTracker::PathTracker(const Path &path, bool align, QObject *parent) : PathTr
 void PathTracker::init(const Path &path, bool align) {
     _path = path;
     _alignPath = align;
-    _curIdx = 0;
-    _totalLength = _curChunkLength = _completedLength = 0.0;
-    _waypointIdxs.clear();
-    _waypointIdxs.append(0);
+    _totalLength = 0.0;
     for(int i = 0; i < path.size() - 1; ++i) {
-        if(path[i] == path[i + 1]) _waypointIdxs.append(i);
-        else _totalLength += distance(path[i], path[i + 1]);
+        _totalLength += distance(path[i], path[i + 1]);
     }
-    _waypointIdxs.append(path.size() - 1);
+
+    findWaypoints();
+    reset();
+}
+
+void PathTracker::reset() {
+    _curIdx = 0;
+    _curChunkLength = _completedLength = 0.0;
     _ignoreNextPoint = false;
     _ignoreCount = 0;
+    _currentPoint = _path.first();
     emit progress(0);
+}
+
+void PathTracker::revert() {
+    std::reverse(_path.begin(), _path.end());
+    findWaypoints();
+    reset();
 }
 
 bool PathTracker::hasNextPoint() const {
@@ -328,11 +338,23 @@ Pose PathTracker::alignedTo(const Pose &p1, const Pose &p2) const {
     return Pose(p1.x, p1.y, Radians(qAtan2(p2.y - p1.y, p2.x - p1.x)));
 }
 
+void PathTracker::findWaypoints() {
+    _waypointIdxs.clear();
+    if(_path.isEmpty()) return;
+
+    _waypointIdxs.append(0);
+    int i = 0;
+    for(auto pi = _path.constBegin(); pi != _path.constEnd() - 1; ++pi, ++i) {
+        if(*pi == *(pi + 1)) _waypointIdxs.append(i);
+    }
+    _waypointIdxs.append(_path.size() - 1);
+}
+
 //=============================================================================
 
 Simulator::ObjectState::ObjectState(WorldObject *object, const Pose &pose, const Path &path)
-    : object(object), path(path.isEmpty() ? 0 : new PathTracker(path, true)), pose(pose)
-{}
+    : object(object), path(path.isEmpty() ? 0 : new PathTracker(path, true)),
+      pose(pose), loops(0) {}
 
 Simulator::ObjectState::~ObjectState() {
     delete path;
@@ -365,6 +387,7 @@ void Simulator::simulate(const SimulatorConfig *config) {
         state = ObjectState(obj, mapToStg(obj->pose()));
         if(obj->motionType() == WorldObject::Trajectory) {
             state.setPath(obj->path(), obj->driveType() != WorldObject::Omni);
+            state.loops = obj->trajectoryLoops() == 0 ? -1 : obj->trajectoryLoops();
             if(obj->type() == WorldObject::Robot) {
                 robotFound = obj->hasPath();
                 connect(state.path, SIGNAL(progress(int)), this, SIGNAL(simulationProgress(int)));
@@ -484,6 +507,27 @@ Simulator::ObjectState *Simulator::stateById(const QString &id) {
     return obj == _objects.end() ? 0 : &obj.value();
 }
 
+void Simulator::onPathComplete(ObjectState *state) {
+    bool done = false;
+    if(state->object->endAction() == WorldObject::StopAtEnd || state->loops == 0) {
+        done = true;
+    } else {
+        switch(state->object->endAction()) {
+        case WorldObject::RunFromStart: state->path->reset(); break;
+        case WorldObject::RunBackward: state->path->revert(); break;
+        default: break;
+        }
+        _stg->setPose(state->object->id(),
+                      mapToStg(state->path->currentPoint()));
+        if(state->loops > 0) --state->loops;
+    }
+
+    if(done && state->object->hideAtEnd()) {
+        _stg->setVisible(state->object->id(), false);
+        emit visibleChanged(state->object->id(), false);
+    }
+}
+
 Pose Simulator::randomOffset(double maxX, double maxY, double maxTh) const {
     return Pose(randomValue(maxX), randomValue(maxY), Radians(randomValue(maxTh)));
 }
@@ -525,6 +569,8 @@ void Simulator::goalReached(const QString &id) {
         case WorldObject::Trajectory:
             if(st->path->hasNextPoint()) {
                 _stg->moveTo(id, mapToStg(st->path->nextPoint()));
+            } else {
+                onPathComplete(st);
             }
             break;
         default:

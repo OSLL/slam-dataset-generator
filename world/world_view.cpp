@@ -51,7 +51,10 @@ void WorldView::setSimulationMode(bool on, bool online) {
     for(auto *r : robots) r->setCrashed(false);
 
     for(auto &ov : _objectViews) {
-        if(!on) ov->item->setPose(ov->waypoints[0]->pose());
+        if(!on) {
+            ov->item->setPose(ov->waypoints[0]->pose());
+            ov->item->setVisible(true);
+        }
         if(ov->object->motionType() == WorldObject::Trajectory
                 && !ov->waypoints.isEmpty()) ov->waypoints[0]->setVisible(on);
         ov->item->blockSignals(on);
@@ -150,6 +153,11 @@ void WorldView::setInteractionMode(InteractionMode mode) {
 void WorldView::setObjectPosition(const QString &id, const Pose &pose) {
     auto *ov = _objectViews[_model->object(id)];
     if(ov) setObjectPose(ov->item, pose);
+}
+
+void WorldView::setObjectVisible(const QString &id, bool on) {
+    auto *ov = _objectViews[_model->object(id)];
+    if(ov) ov->item->setVisible(on);
 }
 
 void WorldView::setRobotCrashed(bool on) {

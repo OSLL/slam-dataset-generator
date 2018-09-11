@@ -73,6 +73,13 @@ void StageWrapper::moveTo(const QString &id, const Pose &goal) {
     obj->goal.setGoalPose(goal);
 }
 
+void StageWrapper::setPose(const QString &id, const Pose &pose) {
+    auto *obj = objectById(id);
+    if(!obj) return;
+    obj->goal.setGoalPose(pose);
+    obj->model->SetPose({pose.x, pose.y, 0.0, pose.th.rad()});
+}
+
 void StageWrapper::setSpeed(const QString &id, const Speed &speed, int timeMs) {
     setSpeed(id, speed.x, speed.y, speed.th.rad(), timeMs);
 }
@@ -83,6 +90,13 @@ void StageWrapper::setSpeed(const QString &id, double x, double y, double a, int
     obj->goal.setGoalTime(_world->SimTimeNow() + 1000 * timeMs);
     obj->model->SetStall(false);
     obj->model->SetSpeed(x, y, a);
+}
+
+void StageWrapper::setVisible(const QString &id, bool on) {
+    auto *obj = objectById(id);
+    if(!obj) return;
+    obj->model->SetObstacleReturn(on);
+    obj->model->SetRangerReturn(on ? 1.0 : -1.0);
 }
 
 void StageWrapper::poseUpdate(const QString &id) {

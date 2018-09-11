@@ -23,7 +23,8 @@ WorldObject::WorldObject(Type type, const QString &id)
       _motion(type == Robot ? Trajectory : Static),
       _drive(type == Robot ? Diff : Omni),
       _speedLin(0.5), _speedAng(90.0),
-      _brush(type == Robot ? QColor(135, 206, 250) : Qt::blue)
+      _brush(type == Robot ? QColor(135, 206, 250) : Qt::blue),
+      _endAction(StopAtEnd), _trajLoops(1), _hideAtEnd(false)
 {
     _waypoints.append({0, 0});
 }
@@ -199,6 +200,9 @@ void WorldModel::setData(WorldObject *object, DataRole role, const QVariant &val
     case SpeedLinRole: SET_DATA(_speedLin, value.toDouble());
     case SpeedAngRole: SET_DATA(_speedAng, value.toDouble());
     case BrushRole:    SET_DATA(_brush, value.value<QBrush>());
+    case TrjEndActionRole: SET_DATA(_endAction, static_cast<WorldObject::EndAction>(value.toInt()));
+    case TrjLoopCountRole: SET_DATA(_trajLoops, value.toInt());
+    case TrjHideAtEndRole: SET_DATA(_hideAtEnd, value.toBool());
 
     case OdomNoiseRole:    SET_ROBOT_DATA(_odomNoise, value.toBool());
     case OdomNoiseLinRole: SET_ROBOT_DATA(_odomNoiseLin, value.toDouble());
@@ -276,6 +280,7 @@ void WorldModel::setWaypoint(WorldObject *object, int i, const Pose &pose) {
 void WorldModel::removeWaypoint(WorldObject *object, int i) {
     object->removeWaypoint(i);
     emit waypointRemoved(object, i);
+    emit dataChanged(object, WaypointRemovedRole, i);
 
     if(object->waypointCount() == 0) {
         removeObject(object);
@@ -298,14 +303,19 @@ void WorldModel::updateTrajectory(WorldObject *object) {
 }
 
 void WorldModel::removeTrajectory(WorldObject *object) {
-    for(int i = object->waypointCount() - 1; i > 0; --i) {
-        emit waypointRemoved(object, i);
-    }
+    int wc = object->waypointCount() - 1;
+    for(int i = wc; i > 0; --i) emit waypointRemoved(object, i);
 
     auto pose = object->pose();
     object->_waypoints.clear();
     object->_waypoints.append(pose);
     object->_paths.clear();
+
+    // TODO: should emit trajectoryRemoved or remove waypoints one by one
+    // since current implementation leads to object state inconsistency
+    for(int i = wc; i > 0; --i) {
+        emit dataChanged(object, WaypointRemovedRole, i);
+    }
 }
 
 void WorldModel::updateAllTrajectories() {
@@ -338,6 +348,7 @@ QString WorldModel::generateId(WorldObject::Type type) {
 int WorldModel::createWaypoint(WorldObject *object, const Pose &pose, int i) {
     i = object->addWaypoint(pose, i);
     emit waypointCreated(object, i);
+    emit dataChanged(object, WaypointAddedRole, i);
     return i;
 }
 
@@ -376,6 +387,9 @@ bool WorldModel::saveObject(const WorldObject *object, ProjectFile &project) con
     settings.setValue("Origin",       object->_origin);
     settings.setValue("Brush",        object->_brush);
     settings.setValue("Shape",        object->_shape);
+    settings.setValue("TrjEndAction", object->_endAction);
+    settings.setValue("TrjLoopCount", object->_trajLoops);
+    settings.setValue("TrjHideAtEnd", object->_hideAtEnd);
     settings.setValue("Waypoints",    toVariantList(object->_waypoints));
 
     if(object->_shape == WorldObject::CustomShape) {
@@ -429,6 +443,10 @@ bool WorldModel::loadObject(ProjectFile &project) {
     setData(object, PoseRole,     pose);
     setData(object, BrushRole,    settings.value("Brush"));
     setData(object, ShapeRole,    settings.value("Shape"));
+
+    setData(object, TrjEndActionRole, settings.value("TrjEndAction"));
+    setData(object, TrjLoopCountRole, settings.value("TrjLoopCount", 1));
+    setData(object, TrjHideAtEndRole, settings.value("TrjHideAtEnd"));
 
     if(object->shapeType() == WorldObject::CustomShape) {
         QPixmap pix = project.getPixmap(settings.value("ShapePix").toString());

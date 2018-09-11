@@ -253,20 +253,30 @@ WorldObjectConfigWidget::WorldObjectConfigWidget(WorldModel *model, QWidget *par
     _ui->_color->setColor(Qt::black);
     connect(_ui->_objectType, SIGNAL(currentIndexChanged(int)), this, SLOT(updateObject()));
     connect(_ui->_driveType, SIGNAL(currentIndexChanged(int)), this, SLOT(updateObject()));
+    connect(_ui->_motionType, SIGNAL(currentIndexChanged(int)), this, SLOT(updateObject()));
     connect(_ui->_color, SIGNAL(colorChanged(QColor)), this, SLOT(updateObject()));
     connect(_ui->_sizeX, SIGNAL(valueChanged(double)), this, SLOT(updateObject()));
     connect(_ui->_sizeY, SIGNAL(valueChanged(double)), this, SLOT(updateObject()));
     connect(_ui->_speedAngular, SIGNAL(valueChanged(double)), this, SLOT(updateObject()));
     connect(_ui->_speedLinear, SIGNAL(valueChanged(double)), this, SLOT(updateObject()));
+    connect(_ui->_trajEndAction, SIGNAL(currentIndexChanged(int)), this, SLOT(updateObject()));
+    connect(_ui->_trajLoopsCount,SIGNAL(valueChanged(int)), this, SLOT(updateObject()));
+    connect(_ui->_trajHideAtEnd, SIGNAL(toggled(bool)), this, SLOT(updateObject()));
+    connect(_ui->_trajLoopsInf, &QCheckBox::toggled, this, [this]() {
+        if(!_ui->_trajLoopsInf->isChecked()) {
+            blocked(_ui->_trajLoopsCount)->setValue(1);
+        }
+        updateObject();
+    });
 
     connect(_ui->_gbOdomNoise, SIGNAL(toggled(bool)), this, SLOT(updateObject()));
     connect(_ui->_odomNoiseLin, SIGNAL(valueChanged(double)), this, SLOT(updateObject()));
     connect(_ui->_odomNoiseAng, SIGNAL(valueChanged(double)), this, SLOT(updateObject()));
 
     connect(_ui->_shapeType, SIGNAL(currentIndexChanged(int)), this, SLOT(changeShape(int)));
-    connect(_ui->_motionType, SIGNAL(currentIndexChanged(int)), this, SLOT(changeMotionType(int)));
-    connect(_ui->_pbRemove, SIGNAL(clicked(bool)), this, SIGNAL(removeRequested()));
     connect(_ui->_pbSelectShape, SIGNAL(clicked(bool)), this, SLOT(selectShape()));
+    connect(_ui->_pbRemove, &QPushButton::clicked, this, [this]() { emit removeObjectRequested(_object); });
+    connect(_ui->_pbRemoveTraj, &QPushButton::clicked, this, [this]() { emit removeTrajectoryRequested(_object); });
 
     connect(_model, SIGNAL(dataChanged(WorldObject*,int,QVariant)),
             this,   SLOT(updateData(WorldObject*,int,QVariant)));
@@ -289,13 +299,16 @@ void WorldObjectConfigWidget::setObject(WorldObject *object) {
     _ui->_color->setColor(object->brush().color());
     _ui->_speedAngular->setValue(object->angularSpeed());
     _ui->_speedLinear->setValue(object->linearSpeed());
+    _ui->_trajEndAction->setCurrentIndex(object->endAction());
+    _ui->_trajLoopsInf->setChecked(object->trajectoryLoops() < 0);
+    _ui->_trajLoopsCount->setValue(object->trajectoryLoops());
+    _ui->_trajHideAtEnd->setChecked(object->hideAtEnd());
 
     _ui->_motionType->setEnabled(object->type() != WorldObject::Robot);
     _ui->_pbSelectShape->setEnabled(object->type() != WorldObject::Robot);
     _ui->_shapeType->setEnabled(object->type() != WorldObject::Robot);
     _ui->_gbOdomNoise->setVisible(object->type() == WorldObject::Robot);
-    _ui->_gbSpeed->setEnabled(_ui->_motionType->currentIndex() != WorldObject::Static);
-    _ui->_driveType->setEnabled(_ui->_motionType->currentIndex() != WorldObject::Static);
+    _ui->_pbRemoveTraj->setEnabled(!object->paths().isEmpty());
 
     if(object->type() == WorldObject::Robot) {
         auto *robot = static_cast<RobotObject*>(object);
@@ -304,21 +317,32 @@ void WorldObjectConfigWidget::setObject(WorldObject *object) {
         _ui->_odomNoiseAng->setValue(robot->odomNoiseAngular());
     }
 
+    updateData(_object, WorldModel::MotionRole, object->motionType());
+    updateData(_object, WorldModel::TrjEndActionRole, object->endAction());
+
     for(auto w : findChildren<QWidget*>()) w->blockSignals(false);
 }
 
 void WorldObjectConfigWidget::keyPressEvent(QKeyEvent *event) {
-    if(event->key() == Qt::Key_Escape) hide();
+    switch(event->key()) {
+    case Qt::Key_Escape: hide(); break;
+    case Qt::Key_Delete: emit removeObjectRequested(_object); break;
+    default: break;
+    }
     QWidget::keyPressEvent(event);
 }
 
 void WorldObjectConfigWidget::updateObject() {
     if(!_object) return;
     _model->setData(_object, WorldModel::DriveRole,    _ui->_driveType->currentIndex());
+    _model->setData(_object, WorldModel::MotionRole,   _ui->_motionType->currentIndex());
     _model->setData(_object, WorldModel::SizeRole,     QSizeF(_ui->_sizeX->value(), _ui->_sizeY->value()));
     _model->setData(_object, WorldModel::SpeedAngRole, _ui->_speedAngular->value());
     _model->setData(_object, WorldModel::SpeedLinRole, _ui->_speedLinear->value());
     _model->setData(_object, WorldModel::BrushRole,    QBrush(_ui->_color->color()));
+    _model->setData(_object, WorldModel::TrjEndActionRole, _ui->_trajEndAction->currentIndex());
+    _model->setData(_object, WorldModel::TrjLoopCountRole, _ui->_trajLoopsInf->isChecked() ? 0 : _ui->_trajLoopsCount->value());
+    _model->setData(_object, WorldModel::TrjHideAtEndRole, _ui->_trajHideAtEnd->isChecked());
     if(_object->type() == WorldObject::Robot) {
         _model->setData(_object, WorldModel::OdomNoiseRole,    _ui->_gbOdomNoise->isEnabled());
         _model->setData(_object, WorldModel::OdomNoiseLinRole, _ui->_odomNoiseLin->value());
@@ -328,13 +352,39 @@ void WorldObjectConfigWidget::updateObject() {
 
 void WorldObjectConfigWidget::updateData(WorldObject *object, int role, const QVariant &value) {
     if(!_object || object != _object) return;
-    switch (role) {
+    switch(role) {
     case WorldModel::SizeRole: {
         auto size = value.toSizeF();
         blocked(_ui->_sizeX)->setValue(size.width());
         blocked(_ui->_sizeY)->setValue(size.height());
         break;
     }
+    case WorldModel::MotionRole: {
+        auto type = static_cast<WorldObject::Motion>(value.toInt());
+        _ui->_driveType->setEnabled(type != WorldObject::Static);
+        _ui->_gbSpeed->setEnabled(type != WorldObject::Static);
+        _ui->_gbTrajectory->setVisible(type == WorldObject::Trajectory);
+        break;
+    }
+    case WorldModel::TrjEndActionRole: {
+        bool withLoops = value.toInt() != WorldObject::StopAtEnd;
+        _ui->_trajLoopsInf->setEnabled(withLoops);
+        _ui->_trajLoopsCount->setEnabled(withLoops && object->trajectoryLoops() > 0);
+        _ui->_trajHideAtEnd->setEnabled(!withLoops || object->trajectoryLoops() > 0);
+        break;
+    }
+    case WorldModel::TrjLoopCountRole: {
+        auto val = value.toInt();
+        blocked(_ui->_trajLoopsInf)->setChecked(val == 0);
+        blocked(_ui->_trajLoopsCount)->setValue(val);
+        _ui->_trajLoopsCount->setEnabled(val > 0);
+        _ui->_trajHideAtEnd->setEnabled(_object->endAction() == WorldObject::StopAtEnd || val > 0);
+        break;
+    }
+    case WorldModel::WaypointAddedRole:
+    case WorldModel::WaypointRemovedRole:
+        _ui->_pbRemoveTraj->setEnabled(!_object->paths().isEmpty());
+        break;
     default:
         break;
     }
@@ -348,12 +398,6 @@ void WorldObjectConfigWidget::changeShape(int id) {
     } else {
         _model->setData(_object, WorldModel::ShapeRole, id);
     }
-}
-
-void WorldObjectConfigWidget::changeMotionType(int id) {
-    _ui->_driveType->setEnabled(id != WorldObject::Static);
-    _ui->_gbSpeed->setEnabled(id != WorldObject::Static);
-    _model->setData(_object, WorldModel::MotionRole, id);
 }
 
 bool WorldObjectConfigWidget::selectShape() {

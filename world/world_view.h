@@ -28,6 +28,7 @@ public slots:
     void clear();
     void setInteractionMode(InteractionMode mode);
     void setObjectPosition(const QString &id, const Pose &pose);
+    void setObjectVisible(const QString &id, bool on);
     void setRobotCrashed(bool on);
     void setLaserScan(const LaserScan &scan);
     void removeSelectedItems();

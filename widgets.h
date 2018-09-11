@@ -144,11 +144,14 @@ public:
     WorldObjectConfigWidget(WorldModel *model, QWidget *parent = 0);
     ~WorldObjectConfigWidget();
 
+    WorldObject *object() const { return _object; }
+
 public slots:
     void setObject(WorldObject *object);
 
 signals:
-    void removeRequested();
+    void removeObjectRequested(WorldObject *object);
+    void removeTrajectoryRequested(WorldObject *object);
 
 protected:
     void keyPressEvent(QKeyEvent *event);
@@ -158,7 +161,6 @@ private slots:
     void updateData(WorldObject *object, int role, const QVariant &value);
 
     void changeShape(int id);
-    void changeMotionType(int id);
     bool selectShape();
 
 private:

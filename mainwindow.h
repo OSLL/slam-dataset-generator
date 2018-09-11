@@ -21,6 +21,7 @@ public slots:
 
 protected:
     void moveEvent(QMoveEvent *event);
+    bool eventFilter(QObject *watched, QEvent *event);
 
 private slots:
     void openProject();
@@ -32,7 +33,6 @@ private slots:
     void cancelSimulation();
     void updateSimulationSettings(SimulatorConfig::Options options);
     void showObjectConfigDialog(WorldObject *object);
-
     void setViewInteractionMode(int tool);
     void setActiveTool(int mode);
 
@@ -47,6 +47,7 @@ private:
     SimulationToolBox *_simTools;
     NotificationsWidget *_notifications;
     WorldObjectConfigWidget *_objConfig;
+    QPoint _objConfigPosDelta;
     QString _currentProject;
 
     QHash<int, int> _toolMap;
