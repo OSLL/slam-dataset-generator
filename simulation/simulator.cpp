@@ -45,6 +45,16 @@ BagWriter::~BagWriter() {
     close();
 }
 
+void BagWriter::setStartTime(const QDateTime &time) {
+    _time = ros::Time().fromNSec(time.toMSecsSinceEpoch() * 1e6);
+}
+
+void BagWriter::setTfPrefix(const QString &prefix) {
+    _tfPrefix = prefix;
+    if(!prefix.startsWith('/')) _tfPrefix.prepend('/');
+    if(!prefix.endsWith('/')) _tfPrefix.append('/');
+}
+
 bool BagWriter::open(const QString &fileName) {
     close();
 
@@ -71,7 +81,7 @@ void BagWriter::writeLaserScan(double time, const LaserScan &scan) {
 
     sensor_msgs::LaserScan msg;
     msg.header.stamp = ts;
-    msg.header.frame_id = "base_laser_link";
+    msg.header.frame_id = addPrefix("base_laser_link");
     msg.angle_min = scan.minAngle;
     msg.angle_max = scan.maxAngle;
     msg.angle_increment = scan.angleIncrement;
@@ -80,12 +90,12 @@ void BagWriter::writeLaserScan(double time, const LaserScan &scan) {
     msg.ranges.reserve(scan.ranges.size());
     for(auto &r : scan.ranges) msg.ranges.push_back(r);
 
-    _bag.write("/base_scan", ts, msg);
+    _bag.write(addPrefix("base_scan", true), ts, msg);
 
     geometry_msgs::TransformStamped tr;
     tr.header.stamp = ts;
-    tr.header.frame_id = "base_link";
-    tr.child_frame_id = "base_laser_link";
+    tr.header.frame_id = addPrefix("base_link");
+    tr.child_frame_id = addPrefix("base_laser_link");
     tr.transform = createTransform(scan.pose.x, scan.pose.y, scan.pose.th.rad());
 
     tf::tfMessage tfMsg;
@@ -100,14 +110,14 @@ void BagWriter::writeRobotPose(double time, const Pose &pose) {
     // frame_id -> child_frame_id
     geometry_msgs::TransformStamped tr1;
     tr1.header.stamp = ts;
-    tr1.header.frame_id = "base_footprint";
-    tr1.child_frame_id = "base_link";
+    tr1.header.frame_id = addPrefix("base_footprint");
+    tr1.child_frame_id = addPrefix("base_link");
     tr1.transform = createTransform(0, 0, 0);
 
     geometry_msgs::TransformStamped tr2;
     tr2.header.stamp = ts;
-    tr2.header.frame_id = "odom_combined";
-    tr2.child_frame_id = "base_footprint";
+    tr2.header.frame_id = addPrefix("odom_combined");
+    tr2.child_frame_id = addPrefix("base_footprint");
     tr2.transform = createTransform(pose.x, pose.y, pose.th.rad());
 
     tf::tfMessage msg;
@@ -124,6 +134,11 @@ geometry_msgs::Transform BagWriter::createTransform(double x, double y, double t
     t.translation.z = 0.0;
     t.rotation = tf::createQuaternionMsgFromYaw(th);
     return t;
+}
+
+std::string BagWriter::addPrefix(const QString &frame, bool topic) const {
+    return QString("%1%2").arg((topic && _tfPrefix.isEmpty()) ? "/" : _tfPrefix)
+                          .arg(frame).toStdString();
 }
 
 //=============================================================================
@@ -158,9 +173,13 @@ void GroundTruthWriter::writeRobotPose(double time, const Pose &pose) {
 
 SimulatorConfig::SimulatorConfig(QWidget *parent) : QWidget(parent) {
     setupUi(this);
+    startTimeTypeChanged();
 
     connect(_outputFile, SIGNAL(textChanged(QString)),
             this, SLOT(updateGtFileName(QString)));
+
+    connect(_rbFixedTime, SIGNAL(toggled(bool)),
+            this, SLOT(startTimeTypeChanged()));
 
     QSignalMapper *sm = new QSignalMapper(this);
     connect(sm, SIGNAL(mapped(int)), this, SLOT(updateOptionsFlags(int)));
@@ -195,6 +214,9 @@ void SimulatorConfig::save(QSettings &settings) const {
     settings.setValue("LaserNoiseC",        laserNoiseConst());
     settings.setValue("LaserNoiseP",        laserNoiseProp());
     settings.setValue("LaserNoiseAng",      laserNoiseAngular());
+    settings.setValue("StartTimeFixed",     isStartTimeFixed());
+    settings.setValue("StartTime",          startTime());
+    settings.setValue("TfPrefix",           tfPrefix());
 }
 
 void SimulatorConfig::load(QSettings &settings) {
@@ -205,6 +227,14 @@ void SimulatorConfig::load(QSettings &settings) {
     _cbGroundtruth->setChecked(settings.value("GTEnabled", false).toBool());
     _gbVisualization->setChecked(settings.value("VisEnabled", true).toBool());
     _laserNoise->setChecked(settings.value("LaserNoiseEnabled", true).toBool());
+    _startTime->setDateTime(settings.value("StartTime",
+                                           QDateTime::fromMSecsSinceEpoch(0)).toDateTime());
+    if(settings.value("StartTimeFixed", false).toBool()) {
+        _rbFixedTime->setChecked(true);
+    } else {
+        _rbCurrentTime->setChecked(true);
+    }
+    setTfPrefix(settings.value("TfPrefix").toString());
     setVisualizationRate(settings.value("VisualizationRate", 20).toInt());
     setMapResolution(settings.value("MapResolution", 0.1).toDouble());
     setSimInterval(settings.value("SimInterval", 100).toInt());
@@ -252,6 +282,13 @@ void SimulatorConfig::applySettings() {
     _updatedOptions = Options(0);
     _pbApply->setEnabled(false);
     emit settingsUpdated(opts);
+}
+
+void SimulatorConfig::startTimeTypeChanged() {
+    if(_rbCurrentTime->isChecked()) {
+        _startTime->setDateTime(QDateTime::currentDateTime());
+    }
+    _startTime->setEnabled(_rbFixedTime->isChecked());
 }
 
 //=============================================================================
@@ -448,6 +485,12 @@ void Simulator::simulate(const SimulatorConfig *config) {
             return;
         }
 
+        if(config->isStartTimeFixed()) {
+            _bag->setStartTime(config->startTime());
+        }
+
+        _bag->setTfPrefix(config->tfPrefix());
+
         if(config->isGroundtruthEnabled()) {
             _gt = new GroundTruthWriter(this);
             _gt->setStartTime(_bag->startTime());
@@ -597,9 +640,9 @@ void Simulator::objectStalled(const QString &id, const Pose &pose) {
         }
         break;
     case WorldObject::Obstacle:
-        _stg->setSpeed(id, -st->speed.x / 2.0, -st->speed.y / 2.0, -st->speed.th.rad() / 2.0,
-                       randomValue(300) + 800);
-//        goalReached(id);
+        //_stg->setSpeed(id, -st->speed.x / 2.0, -st->speed.y / 2.0, -st->speed.th.rad() / 2.0,
+        //               randomValue(300) + 800);
+        goalReached(id);
         break;
     default:
         break;

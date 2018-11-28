@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>319</width>
-    <height>530</height>
+    <width>326</width>
+    <height>637</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -61,7 +61,7 @@
         <property name="checkable">
          <bool>true</bool>
         </property>
-        <layout class="QGridLayout" name="gridLayout_4" columnstretch="0,1,0">
+        <layout class="QGridLayout" name="gridLayout_4" columnstretch="0,0,0">
          <property name="leftMargin">
           <number>3</number>
          </property>
@@ -77,9 +77,6 @@
          <property name="spacing">
           <number>5</number>
          </property>
-         <item row="0" column="1">
-          <widget class="QLineEdit" name="_outputFile"/>
-         </item>
          <item row="0" column="2">
           <widget class="QPushButton" name="_pbOutputFile">
            <property name="maximumSize">
@@ -100,11 +97,92 @@
            </property>
           </widget>
          </item>
-         <item row="1" column="0" colspan="3">
+         <item row="3" column="0" colspan="3">
           <widget class="QCheckBox" name="_cbGroundtruth">
            <property name="text">
             <string>Ground truth</string>
            </property>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="label_6">
+           <property name="text">
+            <string>TF prefix:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QLineEdit" name="_outputFile"/>
+         </item>
+         <item row="1" column="1" colspan="2">
+          <widget class="QLineEdit" name="_tfPrefix"/>
+         </item>
+         <item row="2" column="0" colspan="3">
+          <widget class="QGroupBox" name="groupBox_2">
+           <property name="title">
+            <string>Simulation start time</string>
+           </property>
+           <layout class="QGridLayout" name="gridLayout_2" columnstretch="0,1">
+            <property name="leftMargin">
+             <number>3</number>
+            </property>
+            <property name="topMargin">
+             <number>2</number>
+            </property>
+            <property name="rightMargin">
+             <number>2</number>
+            </property>
+            <property name="bottomMargin">
+             <number>1</number>
+            </property>
+            <property name="spacing">
+             <number>5</number>
+            </property>
+            <item row="0" column="0">
+             <widget class="QRadioButton" name="_rbCurrentTime">
+              <property name="text">
+               <string>Current time</string>
+              </property>
+              <property name="checked">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="0">
+             <widget class="QRadioButton" name="_rbFixedTime">
+              <property name="text">
+               <string>Fixed time:</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="1">
+             <widget class="QDateTimeEdit" name="_startTime">
+              <property name="minimumDateTime">
+               <datetime>
+                <hour>3</hour>
+                <minute>0</minute>
+                <second>0</second>
+                <year>1970</year>
+                <month>1</month>
+                <day>1</day>
+               </datetime>
+              </property>
+              <property name="minimumDate">
+               <date>
+                <year>1970</year>
+                <month>1</month>
+                <day>1</day>
+               </date>
+              </property>
+              <property name="calendarPopup">
+               <bool>false</bool>
+              </property>
+              <property name="timeSpec">
+               <enum>Qt::LocalTime</enum>
+              </property>
+             </widget>
+            </item>
+           </layout>
           </widget>
          </item>
         </layout>
@@ -184,26 +262,10 @@
          <property name="spacing">
           <number>5</number>
          </property>
-         <item row="1" column="1">
-          <widget class="QSpinBox" name="_simulationInterval">
-           <property name="suffix">
-            <string> ms</string>
-           </property>
-           <property name="minimum">
-            <number>1</number>
-           </property>
-           <property name="maximum">
-            <number>1000</number>
-           </property>
-           <property name="value">
-            <number>100</number>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="0">
-          <widget class="QLabel" name="label_9">
+         <item row="0" column="0">
+          <widget class="QLabel" name="label_16">
            <property name="text">
-            <string>Simulation interval:</string>
+            <string>Map resolution:</string>
            </property>
           </widget>
          </item>
@@ -223,10 +285,26 @@
            </property>
           </widget>
          </item>
-         <item row="0" column="0">
-          <widget class="QLabel" name="label_16">
+         <item row="1" column="0">
+          <widget class="QLabel" name="label_9">
            <property name="text">
-            <string>Map resolution:</string>
+            <string>Simulation interval:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QSpinBox" name="_simulationInterval">
+           <property name="suffix">
+            <string> ms</string>
+           </property>
+           <property name="minimum">
+            <number>1</number>
+           </property>
+           <property name="maximum">
+            <number>1000</number>
+           </property>
+           <property name="value">
+            <number>100</number>
            </property>
           </widget>
          </item>
@@ -258,7 +336,7 @@
         <property name="flat">
          <bool>false</bool>
         </property>
-        <layout class="QGridLayout" name="gridLayout_5" columnstretch="0,1,0,1">
+        <layout class="QGridLayout" name="gridLayout_5" columnstretch="0,1,0,0,0">
          <property name="leftMargin">
           <number>3</number>
          </property>
@@ -269,7 +347,7 @@
           <number>2</number>
          </property>
          <property name="bottomMargin">
-          <number>2</number>
+          <number>1</number>
          </property>
          <property name="spacing">
           <number>5</number>
@@ -281,27 +359,11 @@
            </property>
           </widget>
          </item>
-         <item row="0" column="1" colspan="3">
-          <layout class="QHBoxLayout" name="horizontalLayout" stretch="1,0,1">
+         <item row="0" column="2" colspan="3">
+          <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,1">
            <property name="spacing">
             <number>5</number>
            </property>
-           <item>
-            <widget class="QDoubleSpinBox" name="_laserRangeMin">
-             <property name="suffix">
-              <string> m</string>
-             </property>
-             <property name="minimum">
-              <double>0.000000000000000</double>
-             </property>
-             <property name="maximum">
-              <double>1000.000000000000000</double>
-             </property>
-             <property name="value">
-              <double>0.000000000000000</double>
-             </property>
-            </widget>
-           </item>
            <item>
             <widget class="QLabel" name="label_4">
              <property name="text">
@@ -337,27 +399,7 @@
            </property>
           </widget>
          </item>
-         <item row="1" column="1">
-          <widget class="QDoubleSpinBox" name="_laserFOV">
-           <property name="suffix">
-            <string> º</string>
-           </property>
-           <property name="maximum">
-            <double>360.000000000000000</double>
-           </property>
-           <property name="value">
-            <double>270.000000000000000</double>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="2">
-          <widget class="QLabel" name="label_3">
-           <property name="text">
-            <string>Samples:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="3">
+         <item row="1" column="4">
           <widget class="QSpinBox" name="_laserSamples">
            <property name="minimum">
             <number>1</number>
@@ -370,7 +412,7 @@
            </property>
           </widget>
          </item>
-         <item row="2" column="0" colspan="4">
+         <item row="2" column="0" colspan="5">
           <widget class="QGroupBox" name="_laserNoise">
            <property name="title">
             <string>Sensor noise</string>
@@ -508,6 +550,42 @@
            </layout>
           </widget>
          </item>
+         <item row="0" column="1">
+          <widget class="QDoubleSpinBox" name="_laserRangeMin">
+           <property name="suffix">
+            <string> m</string>
+           </property>
+           <property name="minimum">
+            <double>0.000000000000000</double>
+           </property>
+           <property name="maximum">
+            <double>1000.000000000000000</double>
+           </property>
+           <property name="value">
+            <double>0.000000000000000</double>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QDoubleSpinBox" name="_laserFOV">
+           <property name="suffix">
+            <string> º</string>
+           </property>
+           <property name="maximum">
+            <double>360.000000000000000</double>
+           </property>
+           <property name="value">
+            <double>270.000000000000000</double>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="2" colspan="2">
+          <widget class="QLabel" name="label_3">
+           <property name="text">
+            <string>Samples:</string>
+           </property>
+          </widget>
+         </item>
         </layout>
        </widget>
       </item>
@@ -542,18 +620,18 @@
  <resources/>
  <connections>
   <connection>
-   <sender>_laserNoiseType</sender>
-   <signal>currentIndexChanged(int)</signal>
-   <receiver>_laserNoiseSettings</receiver>
-   <slot>setCurrentIndex(int)</slot>
+   <sender>_rbFixedTime</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>_startTime</receiver>
+   <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>181</x>
-     <y>304</y>
+     <x>75</x>
+     <y>358</y>
     </hint>
     <hint type="destinationlabel">
-     <x>160</x>
-     <y>334</y>
+     <x>247</x>
+     <y>358</y>
     </hint>
    </hints>
   </connection>

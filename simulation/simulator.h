@@ -21,7 +21,11 @@ public:
     BagWriter(QObject *parent = 0);
     ~BagWriter();
 
+    void setStartTime(const QDateTime &time);
+    void setStartTime(const ros::Time &time) { _time = time; }
     ros::Time startTime() const { return _time; }
+
+    void setTfPrefix(const QString &prefix);
 
     bool isOpen() const { return _open; }
     bool open(const QString &fileName);
@@ -32,10 +36,12 @@ public:
 
 private:
     geometry_msgs::Transform createTransform(double x, double y, double th) const;
+    std::string addPrefix(const QString &frame, bool topic = false) const;
 
     bool _open;
     ros::Time _time;
     rosbag::Bag _bag;
+    QString _tfPrefix;
 };
 
 //=============================================================================
@@ -99,6 +105,8 @@ public:
     bool isGroundtruthEnabled() const { return _cbGroundtruth->isChecked(); }
     bool isVisualizationEnabled() const { return _gbVisualization->isChecked(); }
     bool isLaserNoiseEnabled() const { return _laserNoise->isChecked(); }
+    bool isStartTimeFixed() const { return _rbFixedTime->isChecked(); }
+    QDateTime startTime() const { return _startTime->dateTime(); }
 
     SB_PROPERTY(int, _visualizationRate, visualizationRate, setVisualizationRate)
     SB_PROPERTY(double, _mapResolution, mapResolution, setMapResolution)
@@ -112,6 +120,7 @@ public:
     SB_PROPERTY(double, _laserNoiseProp, laserNoiseProp, setLaserNoiseProp)
     SB_PROPERTY(double, _laserNoiseAng, laserNoiseAngular, setLaserNoiseAngular)
     LE_PROPERTY(_outputFile, outputFileName, setOutputFileName)
+    LE_PROPERTY(_tfPrefix, tfPrefix, setTfPrefix)
     CB_PROPERTY(_laserNoiseType, laserNoiseType, setLaserNoiseType)
 
 signals:
@@ -122,6 +131,7 @@ private slots:
     void updateGtFileName(const QString &ofn);
     void updateOptionsFlags(int flag);
     void applySettings();
+    void startTimeTypeChanged();
 
 private:
     QString _gtFileName;
